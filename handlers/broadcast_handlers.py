@@ -33,7 +33,7 @@ async def broadcast_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
         days_until_friday = 7
     next_friday = today + timedelta(days=days_until_friday)
     
-    # 格式化日期（格式：October 31,2025）
+    # 格式化日期（格式：November 26,2025）
     date_str = next_friday.strftime("%B %d,%Y")
     weekday_str = next_friday.strftime("%A")
     
@@ -41,10 +41,14 @@ async def broadcast_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     principal_formatted = f"{principal:,.0f}"
     principal_12_formatted = f"{principal_12:,.0f}"
     
+    # 获取未付利息（默认为0）
+    outstanding_interest = 0
+    
     # 构建并发送模板消息
     message = (
         f"Your next payment is due on {date_str} ({weekday_str}) "
-        f"for {principal_formatted} or {principal_12_formatted} to defer the principal payment for one week."
+        f"for {principal_formatted} or {principal_12_formatted} to defer the principal payment for one week.\n\n"
+        f"Your outstanding interest is {outstanding_interest}"
     )
     
     try:

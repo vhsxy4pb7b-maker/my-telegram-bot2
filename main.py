@@ -1,29 +1,21 @@
 """Telegram订单管理机器人主入口"""
-import os
-import sys
-import logging
-from pathlib import Path
-
-# 确保项目根目录在 Python 路径中（必须在所有导入之前）
-# 这样无论从哪里运行，都能找到所有模块
-project_root = Path(__file__).parent.absolute()
-project_root_str = str(project_root)
-
-# 添加项目根目录到 Python 路径（如果还没有）
-if project_root_str not in sys.path:
-    sys.path.insert(0, project_root_str)
-
-# 现在可以安全地导入所有模块
-from decorators import error_handler, admin_required, authorized_required, private_chat_only, group_chat_only
-from utils.schedule_executor import setup_scheduled_broadcasts
-from callbacks import button_callback, handle_order_action_callback, handle_schedule_callback
+from telegram import error as telegram_error
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    filters,
+    CallbackQueryHandler
+)
+import init_db
+from config import BOT_TOKEN, ADMIN_IDS
 from handlers import (
     start,
     create_order,
     show_current_order,
     adjust_funds,
     create_attribution,
-    
+
     list_attributions,
     add_employee,
     remove_employee,
@@ -45,16 +37,24 @@ from handlers import (
     show_all_accounts,
     show_schedule_menu
 )
-from config import BOT_TOKEN, ADMIN_IDS
-import init_db
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    MessageHandler,
-    filters,
-    CallbackQueryHandler
-)
-from telegram import error as telegram_error
+from callbacks import button_callback, handle_order_action_callback, handle_schedule_callback
+from utils.schedule_executor import setup_scheduled_broadcasts
+from decorators import error_handler, admin_required, authorized_required, private_chat_only, group_chat_only
+import os
+import sys
+import logging
+from pathlib import Path
+
+# 确保项目根目录在 Python 路径中（必须在所有导入之前）
+# 这样无论从哪里运行，都能找到所有模块
+project_root = Path(__file__).parent.absolute()
+project_root_str = str(project_root)
+
+# 添加项目根目录到 Python 路径（如果还没有）
+if project_root_str not in sys.path:
+    sys.path.insert(0, project_root_str)
+
+# 现在可以安全地导入所有模块
 
 # 调试信息（部署时可以看到）
 try:
@@ -84,7 +84,7 @@ def main() -> None:
         backup_file = os.path.join(project_root_str, 'database_backup.sql')
         data_dir = os.getenv('DATA_DIR', project_root_str)
         db_path = os.path.join(data_dir, 'loan_bot.db')
-        
+
         # 检查是否存在备份文件且数据库不存在或为空
         if os.path.exists(backup_file):
             if not os.path.exists(db_path):
@@ -97,17 +97,17 @@ def main() -> None:
                     db_dir = os.path.dirname(db_path)
                     if db_dir and not os.path.exists(db_dir):
                         os.makedirs(db_dir, exist_ok=True)
-                    
+
                     conn = sqlite3.connect(db_path)
                     cursor = conn.cursor()
-                    
+
                     with open(backup_file, 'r', encoding='utf-8') as f:
                         sql_script = f.read()
-                    
+
                     cursor.executescript(sql_script)
                     conn.commit()
                     conn.close()
-                    
+
                     logger.info("数据库备份导入成功")
                     print("[OK] 数据库备份导入成功")
                 except Exception as e:
@@ -120,10 +120,11 @@ def main() -> None:
                     import sqlite3
                     conn = sqlite3.connect(db_path)
                     cursor = conn.cursor()
-                    cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table'")
+                    cursor.execute(
+                        "SELECT COUNT(*) FROM sqlite_master WHERE type='table'")
                     table_count = cursor.fetchone()[0]
                     conn.close()
-                    
+
                     if table_count == 0:
                         # 数据库存在但为空，导入备份
                         logger.info("数据库为空，开始导入备份...")
@@ -131,14 +132,14 @@ def main() -> None:
                         try:
                             conn = sqlite3.connect(db_path)
                             cursor = conn.cursor()
-                            
+
                             with open(backup_file, 'r', encoding='utf-8') as f:
                                 sql_script = f.read()
-                            
+
                             cursor.executescript(sql_script)
                             conn.commit()
                             conn.close()
-                            
+
                             logger.info("数据库备份导入成功")
                             print("[OK] 数据库备份导入成功")
                         except Exception as e:
@@ -149,7 +150,7 @@ def main() -> None:
     except Exception as e:
         logger.debug(f"自动导入数据库时出错: {e}")
         # 不影响正常启动
-    
+
     # 验证配置
     if not BOT_TOKEN:
         logger.error("BOT_TOKEN 未设置，无法启动机器人")
@@ -312,6 +313,24 @@ def main() -> None:
         application.post_init = post_init
         # 启动机器人
         application.run_polling(drop_pending_updates=True)
+    except telegram_error.Conflict as e:
+        print("\n" + "="*60)
+        print("⚠️ 检测到多个机器人实例正在运行！")
+        print("="*60)
+        print("\n可能的原因：")
+        print("  1. 本地和部署环境（Zeabur）同时运行")
+        print("  2. 多个本地实例在运行")
+        print("  3. 之前的进程没有正确关闭")
+        print("\n解决方法：")
+        print("  1. 停止本地运行的机器人（按 Ctrl+C）")
+        print("  2. 如果要在本地测试，先停止 Zeabur 部署的实例")
+        print("  3. 确保只有一个实例在运行")
+        print("\n当前检测到多个 Python 进程，请检查：")
+        print("  - 是否有其他终端窗口在运行机器人")
+        print("  - 是否有后台进程在运行")
+        print("="*60)
+        logger.error(f"机器人冲突错误: {e}")
+        return
     except telegram_error.InvalidToken:
         print("\n" + "="*60)
         print("❌ Token 无效或被拒绝！")

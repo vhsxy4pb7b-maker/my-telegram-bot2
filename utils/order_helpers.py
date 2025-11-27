@@ -292,11 +292,14 @@ async def send_auto_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE
         principal_formatted = f"{principal:,.0f}"
         principal_12_formatted = f"{principal_12:,.0f}"
 
+        # 获取未付利息（新订单默认为0）
+        outstanding_interest = 0
+
         # 构建并发送播报消息
         message = (
             f"Your next payment is due on {date_str} ({weekday_str}) "
             f"for {principal_formatted} or {principal_12_formatted} to defer the principal payment for one week.\n\n"
-            f"Your outstanding interest is 0"
+            f"Your outstanding interest is {outstanding_interest}"
         )
 
         await context.bot.send_message(chat_id=chat_id, text=message)
