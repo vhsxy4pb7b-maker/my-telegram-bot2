@@ -244,8 +244,8 @@ async def try_create_order_from_title(update: Update, context: ContextTypes.DEFA
         )
         await update.message.reply_text(msg)
 
-        # 自动播报下一期还款
-        await send_auto_broadcast(update, context, chat_id, amount)
+        # 自动播报下一期还款（基于订单日期计算下个周期）
+        await send_auto_broadcast(update, context, chat_id, amount, created_at)
 
     else:
         # 历史订单流程 (不扣款)
@@ -266,11 +266,11 @@ async def try_create_order_from_title(update: Update, context: ContextTypes.DEFA
         )
         await update.message.reply_text(msg)
 
-        # 历史订单也自动播报
-        await send_auto_broadcast(update, context, chat_id, amount)
+        # 历史订单也自动播报（基于订单日期计算下个周期）
+        await send_auto_broadcast(update, context, chat_id, amount, created_at)
 
 
-async def send_auto_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE, chat_id: int, amount: float):
+async def send_auto_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE, chat_id: int, amount: float, order_date: str = None):
     """订单创建后自动播报下一期还款"""
     try:
         # 计算本金和本金12%
@@ -280,12 +280,15 @@ async def send_auto_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE
         # 获取未付利息（新订单默认为0）
         outstanding_interest = 0
 
-        # 使用统一的播报模板函数
-        from utils.broadcast_helpers import format_broadcast_message
+        # 使用统一的播报模板函数，基于订单日期计算下个周期
+        from utils.broadcast_helpers import format_broadcast_message, calculate_next_payment_date
+        _, date_str, weekday_str = calculate_next_payment_date(order_date)
         message = format_broadcast_message(
             principal=principal,
             principal_12=principal_12,
-            outstanding_interest=outstanding_interest
+            outstanding_interest=outstanding_interest,
+            date_str=date_str,
+            weekday_str=weekday_str
         )
 
         await context.bot.send_message(chat_id=chat_id, text=message)

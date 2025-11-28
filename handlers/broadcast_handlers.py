@@ -25,12 +25,14 @@ async def broadcast_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 从订单获取本金
     principal = order.get('amount', 0)
     principal_12 = principal * 0.12
-    
+
     # 获取未付利息（默认为0）
     outstanding_interest = 0
-    
-    # 使用统一的播报模板函数
-    _, date_str, weekday_str = calculate_next_payment_date()
+
+    # 从订单获取日期，计算下个周期（周四）
+    order_date_str = order.get('date', '')
+    # 使用统一的播报模板函数，基于订单日期计算下个周期
+    _, date_str, weekday_str = calculate_next_payment_date(order_date_str)
     message = format_broadcast_message(
         principal=principal,
         principal_12=principal_12,
@@ -123,7 +125,7 @@ async def send_broadcast_message(update: Update, context: ContextTypes.DEFAULT_T
     principal = data.get('principal', 0)
     principal_12 = data.get('principal_12', 0)
     outstanding_interest = data.get('outstanding_interest', 0)
-    
+
     # 使用统一的播报模板函数
     _, date_str, weekday_str = calculate_next_payment_date()
     message = format_broadcast_message(
