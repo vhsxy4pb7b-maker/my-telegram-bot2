@@ -53,4 +53,3 @@ USER_STATES = {
     'EDITING_ACCOUNT_BY_ID_GCASH': '编辑GCASH账户（按ID）',
     'EDITING_ACCOUNT_BY_ID_PAYMAYA': '编辑PayMaya账户（按ID）'
 }
-

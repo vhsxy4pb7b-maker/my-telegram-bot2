@@ -80,73 +80,33 @@ def main() -> None:
     """启动机器人"""
     # 自动导入数据库备份（如果存在且数据库为空）
     try:
-        import os
+        from utils.db_helpers import import_database_backup, is_database_empty
+        
         backup_file = os.path.join(project_root_str, 'database_backup.sql')
         data_dir = os.getenv('DATA_DIR', project_root_str)
         db_path = os.path.join(data_dir, 'loan_bot.db')
 
         # 检查是否存在备份文件且数据库不存在或为空
         if os.path.exists(backup_file):
+            should_import = False
+            import_reason = ""
+            
             if not os.path.exists(db_path):
-                # 数据库不存在，导入备份
-                logger.info("检测到数据库备份文件，开始导入...")
-                print("[INFO] 检测到数据库备份文件，开始导入...")
-                try:
-                    import sqlite3
-                    # 确保数据库目录存在
-                    db_dir = os.path.dirname(db_path)
-                    if db_dir and not os.path.exists(db_dir):
-                        os.makedirs(db_dir, exist_ok=True)
-
-                    conn = sqlite3.connect(db_path)
-                    cursor = conn.cursor()
-
-                    with open(backup_file, 'r', encoding='utf-8') as f:
-                        sql_script = f.read()
-
-                    cursor.executescript(sql_script)
-                    conn.commit()
-                    conn.close()
-
-                    logger.info("数据库备份导入成功")
+                should_import = True
+                import_reason = "数据库不存在"
+            elif is_database_empty(db_path):
+                should_import = True
+                import_reason = "数据库为空"
+            
+            if should_import:
+                logger.info(f"检测到数据库备份文件，开始导入（原因：{import_reason}）...")
+                print(f"[INFO] 检测到数据库备份文件，开始导入（原因：{import_reason}）...")
+                
+                if import_database_backup(backup_file, db_path):
                     print("[OK] 数据库备份导入成功")
-                except Exception as e:
-                    logger.error(f"导入数据库备份失败: {e}", exc_info=True)
-                    print(f"[ERROR] 导入数据库备份失败: {e}")
+                else:
+                    print("[ERROR] 导入数据库备份失败")
                     # 继续执行，让 init_db 创建新数据库
-            else:
-                # 数据库已存在，检查是否为空
-                try:
-                    import sqlite3
-                    conn = sqlite3.connect(db_path)
-                    cursor = conn.cursor()
-                    cursor.execute(
-                        "SELECT COUNT(*) FROM sqlite_master WHERE type='table'")
-                    table_count = cursor.fetchone()[0]
-                    conn.close()
-
-                    if table_count == 0:
-                        # 数据库存在但为空，导入备份
-                        logger.info("数据库为空，开始导入备份...")
-                        print("[INFO] 数据库为空，开始导入备份...")
-                        try:
-                            conn = sqlite3.connect(db_path)
-                            cursor = conn.cursor()
-
-                            with open(backup_file, 'r', encoding='utf-8') as f:
-                                sql_script = f.read()
-
-                            cursor.executescript(sql_script)
-                            conn.commit()
-                            conn.close()
-
-                            logger.info("数据库备份导入成功")
-                            print("[OK] 数据库备份导入成功")
-                        except Exception as e:
-                            logger.error(f"导入数据库备份失败: {e}", exc_info=True)
-                            print(f"[ERROR] 导入数据库备份失败: {e}")
-                except Exception as e:
-                    logger.debug(f"检查数据库状态时出错: {e}")
     except Exception as e:
         logger.debug(f"自动导入数据库时出错: {e}")
         # 不影响正常启动

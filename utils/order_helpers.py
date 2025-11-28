@@ -8,6 +8,7 @@ import db_operations
 from constants import HISTORICAL_THRESHOLD_DATE, WEEKDAY_GROUP
 from utils.stats_helpers import update_all_stats, update_liquid_capital
 from utils.chat_helpers import is_group_chat, get_current_group, reply_in_group
+from utils.message_builders import build_order_creation_message
 
 logger = logging.getLogger(__name__)
 
@@ -228,15 +229,14 @@ async def try_create_order_from_title(update: Update, context: ContextTypes.DEFA
     # 根据初始状态决定计入 Valid 还是 Breach
     is_initial_breach = (initial_state == 'breach')
 
+    # 更新订单统计
+    if is_initial_breach:
+        await update_all_stats('breach', amount, 1, group_id)
+    else:
+        await update_all_stats('valid', amount, 1, group_id)
+
+    # 非历史订单才扣款和更新客户统计
     if not is_historical:
-        # 正常扣款流程
-
-        # 统计金额/数量
-        if is_initial_breach:
-            await update_all_stats('breach', amount, 1, group_id)
-        else:
-            await update_all_stats('valid', amount, 1, group_id)
-
         # 扣除流动资金
         await update_liquid_capital(-amount)
 
@@ -244,43 +244,24 @@ async def try_create_order_from_title(update: Update, context: ContextTypes.DEFA
         client_field = 'new_clients' if customer == 'A' else 'old_clients'
         await update_all_stats(client_field, amount, 1, group_id)
 
-        msg = (
-            f"✅ Order Created Successfully\n\n"
-            f"📋 Order ID: {order_id}\n"
-            f"🏷️ Group ID: {group_id}\n"
-            f"📅 Date: {created_at}\n"
-            f"👥 Week Group: {weekday_group}\n"
-            f"👤 Customer: {'New' if customer == 'A' else 'Returning'}\n"
-            f"💰 Amount: {amount:.2f}\n"
-            f"📈 Status: {initial_state}"
-        )
-        await update.message.reply_text(msg)
-
         # 自动播报下一期还款（基于订单日期计算下个周期）
         await send_auto_broadcast(update, context, chat_id, amount, created_at)
-
     else:
-        # 历史订单流程 (不扣款)
-        if is_initial_breach:
-            await update_all_stats('breach', amount, 1, group_id)
-        else:
-            await update_all_stats('valid', amount, 1, group_id)
-
-        msg = (
-            f"✅ Historical Order Imported\n\n"
-            f"📋 Order ID: {order_id}\n"
-            f"🏷️ Group ID: {group_id}\n"
-            f"📅 Date: {created_at}\n"
-            f"👤 Customer: {'New' if customer == 'A' else 'Returning'} (Historical)\n"
-            f"💰 Amount: {amount:.2f}\n"
-            f"📈 Status: {initial_state}\n"
-            f"⚠️ Funds Update: Skipped (Historical Data Only)\n"
-            f"📢 Broadcast: Skipped (Historical Data Only)"
-        )
-        await update.message.reply_text(msg)
-
         # 历史订单不播报
         logger.info(f"Historical order {order_id} created, skipping broadcast")
+
+    # 构建并发送确认消息
+    msg = build_order_creation_message(
+        order_id=order_id,
+        group_id=group_id,
+        created_at=created_at,
+        weekday_group=weekday_group,
+        customer=customer,
+        amount=amount,
+        initial_state=initial_state,
+        is_historical=is_historical
+    )
+    await update.message.reply_text(msg)
 
 
 async def send_auto_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE, chat_id: int, amount: float, order_date: str = None):
