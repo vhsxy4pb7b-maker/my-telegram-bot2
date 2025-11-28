@@ -16,45 +16,62 @@ logger = logging.getLogger(__name__)
 
 async def handle_new_chat_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """处理新成员入群（机器人入群）"""
-    # 检查是否是机器人自己被添加
-    if not update.message.new_chat_members:
-        return
+    try:
+        # 检查是否是机器人自己被添加
+        if not update.message or not update.message.new_chat_members:
+            return
 
-    bot_id = context.bot.id
-    is_bot_added = False
-    for member in update.message.new_chat_members:
-        if member.id == bot_id:
-            is_bot_added = True
-            break
+        bot_id = context.bot.id
+        is_bot_added = False
+        for member in update.message.new_chat_members:
+            if member.id == bot_id:
+                is_bot_added = True
+                break
 
-    if not is_bot_added:
-        return
+        if not is_bot_added:
+            return
 
-    chat = update.effective_chat
-    if not chat.title:
-        return
+        chat = update.effective_chat
+        if not chat or not chat.title:
+            logger.warning(f"Bot added to group but no title found (chat_id: {chat.id if chat else 'unknown'})")
+            return
 
-    logger.info(f"Bot added to group: {chat.title} ({chat.id})")
+        logger.info(f"Bot added to group: '{chat.title}' (chat_id: {chat.id})")
 
-    # 尝试创建订单
-    await try_create_order_from_title(update, context, chat, chat.title, manual_trigger=False)
+        # 尝试创建订单
+        await try_create_order_from_title(update, context, chat, chat.title, manual_trigger=False)
+    except Exception as e:
+        logger.error(f"Error in handle_new_chat_members: {e}", exc_info=True)
 
 
 async def handle_new_chat_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """处理群名变更"""
-    chat = update.effective_chat
-    new_title = update.message.new_chat_title
+    try:
+        if not update.message:
+            return
+            
+        chat = update.effective_chat
+        new_title = update.message.new_chat_title
 
-    if not new_title:
-        return
+        if not new_title:
+            logger.warning(f"Group title changed but new_title is None (chat_id: {chat.id if chat else 'unknown'})")
+            return
 
-    logger.info(f"Group title changed to: {new_title} ({chat.id})")
+        if not chat:
+            logger.warning("Group title changed but chat is None")
+            return
 
-    existing_order = await db_operations.get_order_by_chat_id(chat.id)
-    if existing_order:
-        await update_order_state_from_title(update, context, existing_order, new_title)
-    else:
-        await try_create_order_from_title(update, context, chat, new_title, manual_trigger=False)
+        logger.info(f"Group title changed to: '{new_title}' (chat_id: {chat.id})")
+
+        existing_order = await db_operations.get_order_by_chat_id(chat.id)
+        if existing_order:
+            logger.info(f"Order exists, updating state from title: '{new_title}'")
+            await update_order_state_from_title(update, context, existing_order, new_title)
+        else:
+            logger.info(f"No existing order, attempting to create from title: '{new_title}'")
+            await try_create_order_from_title(update, context, chat, new_title, manual_trigger=False)
+    except Exception as e:
+        logger.error(f"Error in handle_new_chat_title: {e}", exc_info=True)
 
 
 async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):

@@ -25,26 +25,30 @@ def get_state_from_title(title: str) -> str:
 def parse_order_from_title(title: str):
     """从群名解析订单信息"""
     # 规则:
-    # 1. 10位数字开头 -> 老客户 (B)
-    # 2. A + 10位数字开头 -> 新客户 (A)
+    # 1. 群名中包含10位连续数字 -> 老客户 (B)
+    # 2. 群名中包含 A + 10位连续数字 -> 新客户 (A)
+    # 注意: 10位数字或A+10位数字可以在群名的任何位置，不一定是开头
 
     customer = 'B'  # Default
     raw_digits = None
     order_id = None
 
-    # Check for New Customer (A...)
-    match_new = re.search(r'^A(\d{10})', title)
+    # Check for New Customer (A + 10 digits, 可以在任何位置)
+    # 匹配 A 后面紧跟10位数字的模式
+    match_new = re.search(r'A(\d{10})', title)
     if match_new:
         customer = 'A'
         raw_digits = match_new.group(1)
         order_id = match_new.group(0)  # A + digits as ID
     else:
-        # Check for Old Customer (10 digits...)
-        match_old = re.search(r'^(\d{10})', title)
+        # Check for Old Customer (10 consecutive digits, 可以在任何位置)
+        # 匹配10位连续数字，但确保不是A后面的（避免重复匹配）
+        # 使用负向前瞻确保前面不是A
+        match_old = re.search(r'(?<!A)(\d{10})(?!\d)', title)
         if match_old:
             customer = 'B'
             raw_digits = match_old.group(1)
-            order_id = match_old.group(0)
+            order_id = match_old.group(1)  # 只有10位数字作为ID
 
     if not raw_digits:
         return None
@@ -136,6 +140,8 @@ async def try_create_order_from_title(update: Update, context: ContextTypes.DEFA
     """尝试从群标题创建订单（通用逻辑）"""
     chat_id = chat.id
 
+    logger.info(f"Attempting to create order from title: '{title}' (chat_id: {chat_id}, manual_trigger: {manual_trigger})")
+
     # 1. 解析群名 (ID, Customer, Date, Amount)
     parsed_info = parse_order_from_title(title)
     if not parsed_info:
@@ -144,11 +150,14 @@ async def try_create_order_from_title(update: Update, context: ContextTypes.DEFA
                 "❌ Invalid Group Title Format.\n"
                 "Expected:\n"
                 "1. Old Customer: 10 digits (e.g., 2401150105)\n"
-                "2. New Customer: A + 10 digits (e.g., A2401150105)"
+                "2. New Customer: A + 10 digits (e.g., A2401150105)\n\n"
+                f"Current title: {title}"
             )
         else:
-            logger.info(f"Group title {title} does not match order pattern.")
+            logger.info(f"Group title '{title}' does not match order pattern (no 10 digits or A+10 digits found).")
         return
+    
+    logger.info(f"Parsed order info: order_id={parsed_info['order_id']}, customer={parsed_info['customer']}, date={parsed_info['date']}, amount={parsed_info['amount']}")
 
     # 2. 检查是否已存在订单
     existing_order = await db_operations.get_order_by_chat_id(chat_id)

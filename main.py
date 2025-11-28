@@ -218,7 +218,7 @@ def main() -> None:
 
     # 订单操作命令（群组，需要授权）
     application.add_handler(CommandHandler(
-        "create", authorized_required(group_chat_only(create_order))))
+        "create", error_handler(authorized_required(group_chat_only(create_order)))))
     application.add_handler(CommandHandler(
         "normal", authorized_required(group_chat_only(set_normal))))
     application.add_handler(CommandHandler(

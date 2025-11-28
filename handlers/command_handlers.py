@@ -58,17 +58,28 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+@error_handler
 @authorized_required
 @group_chat_only
 async def create_order(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """创建新订单 (读取群名)"""
-    chat = update.effective_chat
-    title = chat.title
-    if not title:
-        await update.message.reply_text("❌ Cannot get group title.")
-        return
+    try:
+        chat = update.effective_chat
+        if not chat:
+            logger.error("Cannot get chat from update")
+            return
 
-    await try_create_order_from_title(update, context, chat, title, manual_trigger=True)
+        title = chat.title
+        if not title:
+            await update.message.reply_text("❌ Cannot get group title.")
+            return
+
+        logger.info(f"Creating order from title: {title} in chat {chat.id}")
+        await try_create_order_from_title(update, context, chat, title, manual_trigger=True)
+    except Exception as e:
+        logger.error(f"Error in create_order: {e}", exc_info=True)
+        if update.message:
+            await update.message.reply_text(f"❌ Error creating order: {str(e)}")
 
 
 @authorized_required
