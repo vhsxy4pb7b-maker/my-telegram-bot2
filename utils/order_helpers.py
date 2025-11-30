@@ -28,7 +28,6 @@ def parse_order_from_title(title: str):
     # 规则:
     # 1. 群名中包含10位连续数字 -> 老客户 (B)
     # 2. 群名中包含 A + 10位连续数字 -> 新客户 (A)
-    # 注意: 10位数字或A+10位数字可以在群名的任何位置，不一定是开头
 
     customer = 'B'  # Default
     raw_digits = None

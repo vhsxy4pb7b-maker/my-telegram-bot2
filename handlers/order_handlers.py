@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def _get_chat_info(update: Update):
-    """从update中提取chat_id和reply_func（辅助函数）"""
+    """从update中提取chat_id和reply_func"""
     if update.message:
         return update.message.chat_id, update.message.reply_text
     elif update.callback_query:
@@ -44,7 +44,6 @@ async def set_normal(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await reply_func(message)
             return
 
-        # 群组只回复成功，私聊显示详情
         if is_group_chat(update):
             await reply_func(f"✅ Status Updated: normal\nOrder ID: {order['order_id']}")
         else:
@@ -87,7 +86,6 @@ async def set_overdue(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await reply_func(message)
             return
 
-        # 群组只回复成功，私聊显示详情
         if is_group_chat(update):
             await reply_func(f"✅ Status Updated: overdue\nOrder ID: {order['order_id']}")
         else:
@@ -124,21 +122,14 @@ async def set_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await reply_func(message)
         return
 
-    # 更新订单状态
     await db_operations.update_order_state(chat_id, 'end')
     group_id = order['group_id']
     amount = order['amount']
 
-    # 1. 有效订单减少
     await update_all_stats('valid', -amount, -1, group_id)
-
-    # 2. 完成订单增加
     await update_all_stats('completed', amount, 1, group_id)
-
-    # 3. 流动资金增加
     await update_liquid_capital(amount)
 
-    # 群组只回复成功，私聊显示详情
     if is_group_chat(update):
         await reply_func(f"✅ Order Completed\nAmount: {amount:.2f}")
     else:
@@ -170,7 +161,6 @@ async def set_breach(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await reply_func(message)
             return
 
-        # 更新订单状态
         if not await db_operations.update_order_state(chat_id, 'breach'):
             message = "❌ Failed: DB Error"
             await reply_func(message)
@@ -179,13 +169,9 @@ async def set_breach(update: Update, context: ContextTypes.DEFAULT_TYPE):
         group_id = order['group_id']
         amount = order['amount']
 
-        # 1. 有效订单减少
         await update_all_stats('valid', -amount, -1, group_id)
-
-        # 2. 违约订单增加
         await update_all_stats('breach', amount, 1, group_id)
 
-        # 群组只回复成功，私聊显示详情
         if is_group_chat(update):
             await reply_func(f"✅ Marked as Breach\nAmount: {amount:.2f}")
         else:
@@ -210,8 +196,7 @@ async def set_breach_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id, reply_func = _get_chat_info(update)
     if not chat_id or not reply_func:
         return
-    
-    # 参数仅在 CommandHandler 时存在
+
     args = context.args if update.message else None
 
     order = await db_operations.get_order_by_chat_id(chat_id)
@@ -225,7 +210,6 @@ async def set_breach_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await reply_func(message)
         return
 
-    # 检查是否直接提供了金额参数 (仅限命令方式)
     if args and len(args) > 0:
         try:
             amount = float(args[0])
@@ -233,14 +217,10 @@ async def set_breach_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await reply_func("❌ Amount must be positive.")
                 return
 
-            # 直接执行完成逻辑
             await db_operations.update_order_state(chat_id, 'breach_end')
             group_id = order['group_id']
 
-            # 违约完成订单增加，金额增加
             await update_all_stats('breach_end', amount, 1, group_id)
-
-            # 更新流动资金 (Liquid Flow & Cash Balance)
             await update_liquid_capital(amount)
 
             msg_en = f"✅ Breach Order Ended\nAmount: {amount:.2f}"
@@ -255,7 +235,6 @@ async def set_breach_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await reply_func("❌ Invalid amount format.")
             return
 
-    # 询问金额 (如果没有提供参数)
     if is_group_chat(update):
         await reply_func(
             "Please enter the final amount for this breach order (e.g., 5000).\n"
@@ -264,14 +243,5 @@ async def set_breach_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await reply_func("Please enter the final amount for breach order:")
 
-    # 设置状态，等待输入
     context.user_data['state'] = 'WAITING_BREACH_END_AMOUNT'
     context.user_data['breach_end_chat_id'] = chat_id
-
-
-
-
-
-
-
-

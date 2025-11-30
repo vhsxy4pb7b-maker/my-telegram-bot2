@@ -17,10 +17,10 @@ async def generate_report_text(period_type: str, start_date: str, end_date: str,
     # 获取当前状态数据（资金和有效订单）
     if group_id:
         current_data = await db_operations.get_grouped_data(group_id)
-        report_title = f"📊 归属ID {group_id} 报表"
+        report_title = f"归属ID {group_id} 的报表"
     else:
         current_data = await db_operations.get_financial_data()
-        report_title = "📊 全局报表"
+        report_title = "全局报表"
 
     # 获取周期统计数据
     stats = await db_operations.get_stats_by_date_range(
@@ -30,96 +30,42 @@ async def generate_report_text(period_type: str, start_date: str, end_date: str,
     tz = pytz.timezone('Asia/Shanghai')
     now = datetime.now(tz).strftime("%Y-%m-%d %H:%M")
 
-    # 确定周期显示
+    period_display = ""
     if period_type == "today":
-        period_display = f"📅 今日 ({start_date})"
+        period_display = f"今日数据 ({start_date})"
     elif period_type == "month":
-        period_display = f"📅 本月 ({start_date[:-3]})"
+        period_display = f"本月数据 ({start_date[:-3]})"
     else:
-        period_display = f"📅 区间 ({start_date} 至 {end_date})"
+        period_display = f"区间数据 ({start_date} 至 {end_date})"
 
-    # 计算总收入
-    total_income = (
-        stats['new_clients_amount'] +
-        stats['old_clients_amount'] +
-        stats['interest'] +
-        stats['completed_amount'] +
-        stats['breach_end_amount']
+    report = (
+        f"=== {report_title} ===\n"
+        f"📅 {now}\n"
+        f"{'─' * 25}\n"
+        f"💰 【当前状态】\n"
+        f"有效订单数: {current_data['valid_orders']}\n"
+        f"有效订单金额: {current_data['valid_amount']:.2f}\n"
+        f"{'─' * 25}\n"
+        f"📈 【{period_display}】\n"
+        f"流动资金: {stats['liquid_flow']:.2f}\n"
+        f"新客户数: {stats['new_clients']}\n"
+        f"新客户金额: {stats['new_clients_amount']:.2f}\n"
+        f"老客户数: {stats['old_clients']}\n"
+        f"老客户金额: {stats['old_clients_amount']:.2f}\n"
+        f"利息收入: {stats['interest']:.2f}\n"
+        f"完成订单数: {stats['completed_orders']}\n"
+        f"完成订单金额: {stats['completed_amount']:.2f}\n"
+        f"违约订单数: {stats['breach_orders']}\n"
+        f"违约订单金额: {stats['breach_amount']:.2f}\n"
+        f"违约完成订单数: {stats['breach_end_orders']}\n"
+        f"违约完成金额: {stats['breach_end_amount']:.2f}\n"
+        f"{'─' * 25}\n"
+        f"💸 【开销与余额】\n"
+        f"公司开销: {stats['company_expenses']:.2f}\n"
+        f"其他开销: {stats['other_expenses']:.2f}\n"
+        f"现金余额: {current_data['liquid_funds']:.2f}\n"
     )
-    
-    # 计算总支出
-    total_expenses = (
-        stats['breach_amount'] +
-        stats['company_expenses'] +
-        stats['other_expenses']
-    )
-    
-    # 计算净流量（流动资金）
-    net_flow = total_income - total_expenses
-
-    # 构建报表（更清晰的格式）
-    report_lines = [
-        f"{report_title}",
-        f"{period_display}",
-        f"生成时间: {now}",
-        "",
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        "",
-        "📋 【当前状态】",
-        f"  有效订单: {current_data['valid_orders']} 笔",
-        f"  有效金额: {current_data['valid_amount']:,.2f}",
-        "",
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        "",
-        "📈 【收入明细】",
-    ]
-    
-    # 收入项
-    if stats['new_clients'] > 0 or stats['new_clients_amount'] > 0:
-        report_lines.append(f"  新客户: {stats['new_clients']} 笔 | {stats['new_clients_amount']:,.2f}")
-    if stats['old_clients'] > 0 or stats['old_clients_amount'] > 0:
-        report_lines.append(f"  老客户: {stats['old_clients']} 笔 | {stats['old_clients_amount']:,.2f}")
-    if stats['interest'] > 0:
-        report_lines.append(f"  利息收入: {stats['interest']:,.2f}")
-    if stats['completed_orders'] > 0 or stats['completed_amount'] > 0:
-        report_lines.append(f"  完成订单: {stats['completed_orders']} 笔 | {stats['completed_amount']:,.2f}")
-    if stats['breach_end_orders'] > 0 or stats['breach_end_amount'] > 0:
-        report_lines.append(f"  违约完成: {stats['breach_end_orders']} 笔 | {stats['breach_end_amount']:,.2f}")
-    
-    if total_income > 0:
-        report_lines.append(f"  ────────────────────────")
-        report_lines.append(f"  收入合计: {total_income:,.2f}")
-    
-    report_lines.extend([
-        "",
-        "📉 【支出明细】",
-    ])
-    
-    # 支出项
-    if stats['breach_orders'] > 0 or stats['breach_amount'] > 0:
-        report_lines.append(f"  违约订单: {stats['breach_orders']} 笔 | {stats['breach_amount']:,.2f}")
-    if stats['company_expenses'] > 0:
-        report_lines.append(f"  公司开销: {stats['company_expenses']:,.2f}")
-    if stats['other_expenses'] > 0:
-        report_lines.append(f"  其他开销: {stats['other_expenses']:,.2f}")
-    
-    if total_expenses > 0:
-        report_lines.append(f"  ────────────────────────")
-        report_lines.append(f"  支出合计: {total_expenses:,.2f}")
-    
-    report_lines.extend([
-        "",
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        "",
-        "💰 【资金总结】",
-        f"  流动资金: {stats['liquid_flow']:,.2f}",
-        f"  （收入 {total_income:,.2f} - 支出 {total_expenses:,.2f} = {net_flow:,.2f}）",
-        "",
-        "💵 【账户余额】",
-        f"  现金余额: {current_data['liquid_funds']:,.2f}",
-    ])
-    
-    return "\n".join(report_lines)
+    return report
 
 
 @error_handler
@@ -171,4 +117,3 @@ async def show_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(report_text, reply_markup=reply_markup)
-
