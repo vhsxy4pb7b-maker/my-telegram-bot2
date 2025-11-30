@@ -7,7 +7,7 @@ from telegram.ext import ContextTypes
 import db_operations
 from constants import HISTORICAL_THRESHOLD_DATE, WEEKDAY_GROUP
 from utils.stats_helpers import update_all_stats, update_liquid_capital
-from utils.chat_helpers import is_group_chat, get_current_group, reply_in_group
+from utils.chat_helpers import is_group_chat, get_current_group, get_weekday_group_from_date, reply_in_group
 from utils.message_builders import build_order_creation_message
 
 logger = logging.getLogger(__name__)
@@ -202,7 +202,8 @@ async def try_create_order_from_title(update: Update, context: ContextTypes.DEFA
             return
 
     group_id = 'S01'  # 默认归属
-    weekday_group = get_current_group()
+    # 根据订单日期确定星期分组（历史订单和正常订单都使用订单日期）
+    weekday_group = get_weekday_group_from_date(order_date)
 
     # 构造创建时间
     created_at = f"{order_date.strftime('%Y-%m-%d')} 12:00:00"

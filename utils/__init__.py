@@ -9,7 +9,7 @@ project_root = Path(__file__).parent.parent.absolute()
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from .chat_helpers import is_group_chat, get_current_group, reply_in_group
+from .chat_helpers import is_group_chat, get_current_group, get_weekday_group_from_date, reply_in_group
 from .date_helpers import get_daily_period_date
 from .order_helpers import (
     parse_order_from_title,
@@ -23,6 +23,7 @@ from .message_helpers import display_search_results_helper
 __all__ = [
     'is_group_chat',
     'get_current_group',
+    'get_weekday_group_from_date',
     'reply_in_group',
     'get_daily_period_date',
     'parse_order_from_title',
