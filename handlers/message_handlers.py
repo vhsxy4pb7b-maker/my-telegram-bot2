@@ -134,6 +134,10 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _handle_search_input(update, context, text)
         return
 
+    if user_state == 'SEARCHING_AMOUNT':
+        await _handle_search_amount_input(update, context, text)
+        return
+
     if user_state == 'REPORT_QUERY':
         await _handle_report_query(update, context, text)
         return
@@ -401,6 +405,97 @@ async def _handle_search_input(update: Update, context: ContextTypes.DEFAULT_TYP
     except Exception as e:
         logger.error(f"搜索出错: {e}")
         await update.message.reply_text(f"⚠️ Search Error: {e}")
+        context.user_data['state'] = None
+
+
+async def _handle_search_amount_input(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    """处理按总有效金额查找输入"""
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    from utils.amount_helpers import parse_amount, distribute_orders_evenly_by_weekday
+    from utils.message_helpers import display_search_results_helper
+    
+    try:
+        # 解析金额
+        target_amount = parse_amount(text)
+        if target_amount is None or target_amount <= 0:
+            await update.message.reply_text(
+                "❌ 无效的金额格式\n\n"
+                "请输入有效的金额，例如：\n"
+                "• 20万\n"
+                "• 200000\n\n"
+                "输入 'cancel' 取消"
+            )
+            return
+        
+        # 获取所有有效订单（normal和overdue状态）
+        criteria = {}
+        all_valid_orders = await db_operations.search_orders_advanced(criteria)
+        
+        if not all_valid_orders:
+            await update.message.reply_text("❌ 没有找到有效订单")
+            context.user_data['state'] = None
+            return
+        
+        # 计算总有效金额
+        total_valid_amount = sum(order.get('amount', 0) for order in all_valid_orders)
+        
+        if total_valid_amount < target_amount:
+            await update.message.reply_text(
+                f"❌ 总有效金额不足\n\n"
+                f"目标金额: {target_amount:,.2f}\n"
+                f"当前总有效金额: {total_valid_amount:,.2f}\n"
+                f"差额: {target_amount - total_valid_amount:,.2f}"
+            )
+            context.user_data['state'] = None
+            return
+        
+        # 均匀分配选择订单
+        selected_orders = distribute_orders_evenly_by_weekday(all_valid_orders, target_amount)
+        
+        if not selected_orders:
+            await update.message.reply_text("❌ 无法选择订单，请尝试调整目标金额")
+            context.user_data['state'] = None
+            return
+        
+        # 计算选中订单的总金额
+        selected_amount = sum(order.get('amount', 0) for order in selected_orders)
+        selected_count = len(selected_orders)
+        
+        # 按星期分组统计
+        weekday_stats = {}
+        for order in selected_orders:
+            weekday = order.get('weekday_group', '未知')
+            if weekday not in weekday_stats:
+                weekday_stats[weekday] = {'count': 0, 'amount': 0.0}
+            weekday_stats[weekday]['count'] += 1
+            weekday_stats[weekday]['amount'] += order.get('amount', 0)
+        
+        # 显示结果
+        result_msg = (
+            f"💰 按总有效金额查找结果\n\n"
+            f"目标金额: {target_amount:,.2f}\n"
+            f"选中金额: {selected_amount:,.2f}\n"
+            f"差额: {target_amount - selected_amount:,.2f}\n"
+            f"选中订单数: {selected_count}\n\n"
+            f"按星期分组统计:\n"
+        )
+        
+        weekday_names = ['一', '二', '三', '四', '五', '六', '日']
+        for weekday in weekday_names:
+            if weekday in weekday_stats:
+                stats = weekday_stats[weekday]
+                result_msg += f"周{weekday}: {stats['count']}个订单, {stats['amount']:,.2f}\n"
+        
+        await update.message.reply_text(result_msg)
+        
+        # 使用display_search_results_helper显示结果并锁定群组
+        await display_search_results_helper(update, context, selected_orders)
+        
+        context.user_data['state'] = None
+        
+    except Exception as e:
+        logger.error(f"按金额查找出错: {e}", exc_info=True)
+        await update.message.reply_text(f"⚠️ 查找出错: {e}")
         context.user_data['state'] = None
 
 

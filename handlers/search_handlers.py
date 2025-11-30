@@ -24,6 +24,10 @@ async def search_orders(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "按归属ID", callback_data="search_menu_attribution"),
                 InlineKeyboardButton(
                     "按星期分组", callback_data="search_menu_group")
+            ],
+            [
+                InlineKeyboardButton(
+                    "按总有效金额", callback_data="search_menu_amount")
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -40,6 +44,10 @@ async def search_orders(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "按归属ID", callback_data="search_menu_attribution"),
                 InlineKeyboardButton(
                     "按星期分组", callback_data="search_menu_group")
+            ],
+            [
+                InlineKeyboardButton(
+                    "按总有效金额", callback_data="search_menu_amount")
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)

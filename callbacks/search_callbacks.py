@@ -78,9 +78,27 @@ async def handle_search_callback(update: Update, context: ContextTypes.DEFAULT_T
                     "按归属ID", callback_data="search_menu_attribution"),
                 InlineKeyboardButton(
                     "按星期分组", callback_data="search_menu_group")
+            ],
+            [
+                InlineKeyboardButton(
+                    "按总有效金额", callback_data="search_menu_amount")
             ]
         ]
         await query.edit_message_text("🔍 查找方式:", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+
+    if data == "search_menu_amount":
+        await query.message.reply_text(
+            "💰 按总有效金额查找\n\n"
+            "请输入目标金额（支持'万'单位）：\n"
+            "例如：\n"
+            "• 20万（从周一到周日均匀选取总金额20万的订单）\n"
+            "• 200000（直接输入数字）\n\n"
+            "系统将从周一到周日的有效订单中，均匀地选择订单，使得总金额接近目标金额。\n\n"
+            "请输入:（输入 'cancel' 取消）"
+        )
+        context.user_data['state'] = 'SEARCHING_AMOUNT'
+        await query.answer()
         return
 
     if data == "search_lock_start":

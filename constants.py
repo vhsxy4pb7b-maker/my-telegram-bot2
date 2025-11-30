@@ -51,5 +51,6 @@ USER_STATES = {
     'ADDING_ACCOUNT_GCASH': '添加GCASH账户',
     'ADDING_ACCOUNT_PAYMAYA': '添加PayMaya账户',
     'EDITING_ACCOUNT_BY_ID_GCASH': '编辑GCASH账户（按ID）',
-    'EDITING_ACCOUNT_BY_ID_PAYMAYA': '编辑PayMaya账户（按ID）'
+    'EDITING_ACCOUNT_BY_ID_PAYMAYA': '编辑PayMaya账户（按ID）',
+    'SEARCHING_AMOUNT': '搜索中（按金额）'
 }
