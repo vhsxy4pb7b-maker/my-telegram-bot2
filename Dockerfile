@@ -1,4 +1,7 @@
 # 使用 Python 3.11 作为基础镜像
+# 如果 python:3.11-slim 拉取失败，可以尝试：
+# FROM python:3.11
+# 或 FROM python:3.11.0-slim
 FROM python:3.11-slim
 
 # 设置工作目录
