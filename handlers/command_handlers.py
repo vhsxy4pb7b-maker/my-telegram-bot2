@@ -270,6 +270,97 @@ async def remove_employee(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @admin_required
 @private_chat_only
+async def update_weekday_groups(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """更新所有订单的星期分组（管理员命令）"""
+    try:
+        msg = await update.message.reply_text("🔄 开始更新所有订单的星期分组...")
+        
+        # 直接调用更新逻辑
+        from datetime import datetime
+        from utils.chat_helpers import get_weekday_group_from_date
+        
+        all_orders = await db_operations.search_orders_advanced_all_states({})
+        
+        if not all_orders:
+            await msg.edit_text("❌ 没有找到订单")
+            return
+        
+        updated_count = 0
+        error_count = 0
+        skipped_count = 0
+        
+        for order in all_orders:
+            order_id = order['order_id']
+            chat_id = order['chat_id']
+            order_date_str = order.get('date', '')
+            
+            try:
+                # 从订单ID解析日期
+                date_from_id = None
+                if order_id.startswith('A'):
+                    if len(order_id) >= 7 and order_id[1:7].isdigit():
+                        date_part = order_id[1:7]
+                        try:
+                            full_date_str = f"20{date_part}"
+                            date_from_id = datetime.strptime(full_date_str, "%Y%m%d").date()
+                        except ValueError:
+                            pass
+                else:
+                    if len(order_id) >= 6 and order_id[:6].isdigit():
+                        date_part = order_id[:6]
+                        try:
+                            full_date_str = f"20{date_part}"
+                            date_from_id = datetime.strptime(full_date_str, "%Y%m%d").date()
+                        except ValueError:
+                            pass
+                
+                # 从date字段解析日期
+                date_from_db = None
+                if order_date_str:
+                    try:
+                        date_str = order_date_str.split()[0] if ' ' in order_date_str else order_date_str
+                        date_from_db = datetime.strptime(date_str, "%Y-%m-%d").date()
+                    except ValueError:
+                        pass
+                
+                order_date = date_from_id or date_from_db
+                
+                if not order_date:
+                    skipped_count += 1
+                    continue
+                
+                # 计算正确的星期分组
+                correct_weekday_group = get_weekday_group_from_date(order_date)
+                
+                # 更新
+                success = await db_operations.update_order_weekday_group(chat_id, correct_weekday_group)
+                
+                if success:
+                    updated_count += 1
+                else:
+                    error_count += 1
+                    
+            except Exception as e:
+                logger.error(f"处理订单 {order_id} 时出错: {e}")
+                error_count += 1
+        
+        result_msg = (
+            f"✅ 更新完成！\n\n"
+            f"已更新: {updated_count} 个订单\n"
+            f"跳过: {skipped_count} 个订单\n"
+            f"错误: {error_count} 个订单\n"
+            f"总计: {len(all_orders)} 个订单"
+        )
+        
+        await msg.edit_text(result_msg)
+            
+    except Exception as e:
+        logger.error(f"更新星期分组时出错: {e}", exc_info=True)
+        await update.message.reply_text(f"❌ 更新失败: {str(e)}")
+
+
+@admin_required
+@private_chat_only
 async def list_employees(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """列出所有员工"""
     users = await db_operations.get_authorized_users()

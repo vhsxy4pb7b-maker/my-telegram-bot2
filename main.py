@@ -20,6 +20,7 @@ from handlers import (
     add_employee,
     remove_employee,
     list_employees,
+    update_weekday_groups,
     set_normal,
     set_overdue,
     set_end,
@@ -81,7 +82,7 @@ def main() -> None:
     # 自动导入数据库备份（如果存在且数据库为空）
     try:
         from utils.db_helpers import import_database_backup, is_database_empty
-        
+
         backup_file = os.path.join(project_root_str, 'database_backup.sql')
         data_dir = os.getenv('DATA_DIR', project_root_str)
         db_path = os.path.join(data_dir, 'loan_bot.db')
@@ -90,18 +91,18 @@ def main() -> None:
         if os.path.exists(backup_file):
             should_import = False
             import_reason = ""
-            
+
             if not os.path.exists(db_path):
                 should_import = True
                 import_reason = "数据库不存在"
             elif is_database_empty(db_path):
                 should_import = True
                 import_reason = "数据库为空"
-            
+
             if should_import:
                 logger.info(f"检测到数据库备份文件，开始导入（原因：{import_reason}）...")
                 print(f"[INFO] 检测到数据库备份文件，开始导入（原因：{import_reason}）...")
-                
+
                 if import_database_backup(backup_file, db_path):
                     print("[OK] 数据库备份导入成功")
                 else:
@@ -209,6 +210,8 @@ def main() -> None:
         "remove_employee", private_chat_only(admin_required(remove_employee))))
     application.add_handler(CommandHandler(
         "list_employees", private_chat_only(admin_required(list_employees))))
+    application.add_handler(CommandHandler(
+        "update_weekday_groups", private_chat_only(admin_required(update_weekday_groups))))
 
     # 自动订单创建（新成员入群监听 & 群名变更监听）
     application.add_handler(MessageHandler(

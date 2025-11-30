@@ -8,7 +8,8 @@ from .command_handlers import (
     list_attributions,
     add_employee,
     remove_employee,
-    list_employees
+    list_employees,
+    update_weekday_groups
 )
 from .order_handlers import (
     set_normal,
@@ -50,6 +51,7 @@ __all__ = [
     'add_employee',
     'remove_employee',
     'list_employees',
+    'update_weekday_groups',
     'set_normal',
     'set_overdue',
     'set_end',
