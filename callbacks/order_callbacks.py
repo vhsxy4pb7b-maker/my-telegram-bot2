@@ -114,8 +114,10 @@ async def handle_order_action_callback(update: Update, context: ContextTypes.DEF
         if success_count > 0:
             msg = "✅ Attribution changed" if is_group else "✅ 归属变更完成"
             await query.answer(msg)
-            # 刷新订单信息显示
-            await show_current_order(update, context)
+            # 在群聊中不刷新订单信息显示，只保留结果消息
+            # 在私聊中可以刷新显示
+            if not is_group:
+                await show_current_order(update, context)
         else:
             msg = "❌ Attribution change failed" if is_group else "❌ 归属变更失败"
             await query.answer(msg, show_alert=True)
@@ -123,7 +125,12 @@ async def handle_order_action_callback(update: Update, context: ContextTypes.DEF
 
     # 处理返回按钮
     if data == "order_action_back":
-        await show_current_order(update, context)
+        is_group = is_group_chat(update)
+        # 在群聊中，返回时不刷新显示，只关闭当前选择界面
+        if is_group:
+            await query.delete_message()
+        else:
+            await show_current_order(update, context)
         await query.answer()
         return
 
