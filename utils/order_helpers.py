@@ -38,17 +38,14 @@ def parse_order_from_title(title: str):
     order_id = None
     is_11_digits = False
 
-    # 匹配群名开头的10个或11个连续数字，后面可能跟A
-    # 群名必须以10或11个数字开始，后面只能跟A或没有其他内容
+    # 匹配群名开头的10个或11个连续数字，后面可以跟任何内容
+    # 群名必须以10或11个数字开始，后面可以跟A（表示新客户）或其他任何内容
     # 优先匹配11位数字（更具体）
     match_11 = re.match(r'^(\d{11})(A)?', title)
     if match_11:
         # 确保不是12位数字的前11位
         if len(title) > 11 and title[11].isdigit():
             # 是12位数字，不匹配
-            match_11 = None
-        elif len(title) > 11 and title[11] != 'A':
-            # 11位数字后跟非A字符，不匹配
             match_11 = None
         else:
             raw_digits = match_11.group(1)
@@ -59,7 +56,7 @@ def parse_order_from_title(title: str):
             else:
                 customer = 'B'
                 order_id = raw_digits  # 只有11位数字
-    
+
     if not match_11:
         # 匹配10位数字，确保后面不是第11位数字
         match_10 = re.match(r'^(\d{10})(A)?', title)
@@ -67,9 +64,6 @@ def parse_order_from_title(title: str):
             # 确保不是11位数字的前10位
             if len(title) > 10 and title[10].isdigit():
                 # 是11位数字，不匹配（应该匹配11位）
-                match_10 = None
-            elif len(title) > 10 and title[10] != 'A':
-                # 10位数字后跟非A字符，不匹配
                 match_10 = None
             else:
                 raw_digits = match_10.group(1)
@@ -86,7 +80,7 @@ def parse_order_from_title(title: str):
 
     # 解析日期部分 (前6位: YYMMDD)
     date_part = raw_digits[:6]
-    
+
     try:
         # 假设 20YY
         full_date_str = f"20{date_part}"
