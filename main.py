@@ -9,37 +9,76 @@ from telegram.ext import (
 )
 import init_db
 from config import BOT_TOKEN, ADMIN_IDS
-from handlers import (
-    start,
-    create_order,
-    show_current_order,
-    adjust_funds,
-    create_attribution,
+try:
+    from handlers import (
+        start,
+        create_order,
+        show_current_order,
+        adjust_funds,
+        create_attribution,
 
-    list_attributions,
-    add_employee,
-    remove_employee,
-    list_employees,
-    update_weekday_groups,
-    fix_statistics,
-    find_tail_orders,
-    set_normal,
-    set_overdue,
-    set_end,
-    set_breach,
-    set_breach_end,
-    handle_amount_operation,
-    show_report,
-    search_orders,
-    handle_new_chat_members,
-    handle_new_chat_title,
-    handle_text_input,
-    broadcast_payment,
-    show_gcash,
-    show_paymaya,
-    show_all_accounts,
-    show_schedule_menu
-)
+        list_attributions,
+        add_employee,
+        remove_employee,
+        list_employees,
+        update_weekday_groups,
+        fix_statistics,
+        find_tail_orders,
+        set_normal,
+        set_overdue,
+        set_end,
+        set_breach,
+        set_breach_end,
+        handle_amount_operation,
+        show_report,
+        search_orders,
+        handle_new_chat_members,
+        handle_new_chat_title,
+        handle_text_input,
+        broadcast_payment,
+        show_gcash,
+        show_paymaya,
+        show_all_accounts,
+        show_schedule_menu
+    )
+except ImportError as e:
+    print(f"[ERROR] Import error: {e}")
+    print(f"[ERROR] Trying to import find_tail_orders directly...")
+    try:
+        from handlers.command_handlers import find_tail_orders
+        from handlers import (
+            start,
+            create_order,
+            show_current_order,
+            adjust_funds,
+            create_attribution,
+            list_attributions,
+            add_employee,
+            remove_employee,
+            list_employees,
+            update_weekday_groups,
+            fix_statistics,
+            set_normal,
+            set_overdue,
+            set_end,
+            set_breach,
+            set_breach_end,
+            handle_amount_operation,
+            show_report,
+            search_orders,
+            handle_new_chat_members,
+            handle_new_chat_title,
+            handle_text_input,
+            broadcast_payment,
+            show_gcash,
+            show_paymaya,
+            show_all_accounts,
+            show_schedule_menu
+        )
+        print("[INFO] Successfully imported find_tail_orders directly")
+    except Exception as e2:
+        print(f"[ERROR] Direct import also failed: {e2}")
+        raise
 from callbacks import button_callback, handle_order_action_callback, handle_schedule_callback
 from utils.schedule_executor import setup_scheduled_broadcasts
 from decorators import error_handler, admin_required, authorized_required, private_chat_only, group_chat_only

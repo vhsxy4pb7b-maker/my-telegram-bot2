@@ -1,4 +1,15 @@
 """命令处理器模块"""
+import os
+import sys
+from pathlib import Path
+
+# 确保项目根目录在 Python 路径中
+# 这样子模块在导入时能找到 decorators, utils 等模块
+# ⚠️ 必须在所有导入语句之前执行！否则会导致 ModuleNotFoundError
+project_root = Path(__file__).parent.parent.absolute()
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
 from .command_handlers import (
     start,
     create_order,
@@ -31,16 +42,6 @@ from .message_handlers import (
 from .broadcast_handlers import broadcast_payment
 from .payment_handlers import show_gcash, show_paymaya, show_all_accounts
 from .schedule_handlers import show_schedule_menu, handle_schedule_input
-import os
-import sys
-from pathlib import Path
-
-# 确保项目根目录在 Python 路径中
-# 这样子模块在导入时能找到 decorators, utils 等模块
-# ⚠️ 必须在所有导入语句之前执行！否则会导致 ModuleNotFoundError
-project_root = Path(__file__).parent.parent.absolute()
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
 
 
 __all__ = [
