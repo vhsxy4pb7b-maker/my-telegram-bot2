@@ -258,8 +258,7 @@ def main() -> None:
         authorized_required(handle_order_action_callback), pattern="^order_change_to_"))
     application.add_handler(CallbackQueryHandler(
         authorized_required(handle_schedule_callback), pattern="^schedule_"))
-    application.add_handler(CallbackQueryHandler(
-        authorized_required(button_callback)))
+    application.add_handler(CallbackQueryHandler(button_callback))
 
     # 启动机器人
     try:

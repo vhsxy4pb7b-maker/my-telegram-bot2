@@ -5,15 +5,44 @@ from telegram.ext import ContextTypes
 from callbacks.report_callbacks import handle_report_callback
 from callbacks.search_callbacks import handle_search_callback
 from callbacks.payment_callbacks import handle_payment_callback
-from decorators import authorized_required
+import db_operations
 
 logger = logging.getLogger(__name__)
 
 
-@authorized_required
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """主按钮回调入口"""
     query = update.callback_query
+    data = query.data
+
+    # 获取用户ID
+    user_id = update.effective_user.id if update.effective_user else None
+    
+    # 对于报表回调，允许受限用户使用（只要他们有 user_group_id）
+    if data.startswith("report_"):
+        # 报表回调允许受限用户使用，权限检查在 handle_report_callback 内部进行
+        try:
+            await query.answer()
+        except Exception:
+            pass
+        await handle_report_callback(update, context)
+        return
+    
+    # 其他回调需要授权（管理员或员工）
+    from decorators import authorized_required
+    
+    # 检查是否是管理员或授权员工
+    if not user_id:
+        await query.answer("❌ 无法获取用户信息", show_alert=True)
+        return
+    
+    from config import ADMIN_IDS
+    is_admin = user_id in ADMIN_IDS
+    is_authorized = await db_operations.is_user_authorized(user_id)
+    
+    if not is_admin and not is_authorized:
+        await query.answer("⚠️ Permission denied.", show_alert=True)
+        return
 
     # 必须先 answer，防止客户端转圈
     try:
@@ -21,16 +50,12 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         pass  # 忽略 answer 错误（例如 query 已过期）
 
-    data = query.data
-
     # 记录日志以便排查
     logger.info(
         f"Processing callback: {data} from user {update.effective_user.id}")
 
     if data.startswith("search_"):
         await handle_search_callback(update, context)
-    elif data.startswith("report_"):
-        await handle_report_callback(update, context)
     elif data.startswith("payment_"):
         await handle_payment_callback(update, context)
     elif data == "broadcast_start":
