@@ -309,6 +309,22 @@ async def _handle_expense_query(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def _handle_expense_input(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str, user_state: str):
     """处理开销输入"""
+    # 检查权限：只有管理员或授权员工可以录入开销
+    user_id = update.effective_user.id if update.effective_user else None
+    if not user_id:
+        await update.message.reply_text("❌ 无法获取用户信息")
+        context.user_data['state'] = None
+        return
+    
+    from config import ADMIN_IDS
+    is_admin = user_id in ADMIN_IDS
+    is_authorized = await db_operations.is_user_authorized(user_id)
+    
+    if not is_admin and not is_authorized:
+        await update.message.reply_text("❌ 您没有权限录入开销（仅限员工和管理员）")
+        context.user_data['state'] = None
+        return
+    
     try:
         # 格式: 金额 备注
         parts = text.strip().split(maxsplit=1)

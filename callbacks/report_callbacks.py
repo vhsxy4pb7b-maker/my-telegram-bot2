@@ -6,6 +6,16 @@ from telegram.ext import ContextTypes
 import db_operations
 from utils.date_helpers import get_daily_period_date
 from handlers.report_handlers import generate_report_text
+from config import ADMIN_IDS
+
+
+async def _check_expense_permission(user_id: int) -> bool:
+    """检查用户是否有权限录入开销（异步版本）"""
+    if not user_id:
+        return False
+    if user_id in ADMIN_IDS:
+        return True
+    return await db_operations.is_user_authorized(user_id)
 
 
 async def handle_report_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -109,6 +119,16 @@ async def handle_report_callback(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     if data == "report_add_expense_company":
+        # 检查权限：只有管理员或授权员工可以录入开销
+        user_id = update.effective_user.id if update.effective_user else None
+        if not user_id:
+            await query.answer("❌ 无法获取用户信息", show_alert=True)
+            return
+        
+        if not await _check_expense_permission(user_id):
+            await query.answer("❌ 您没有权限录入开销（仅限员工和管理员）", show_alert=True)
+            return
+        
         await query.message.reply_text(
             "🏢 请输入金额和备注：\n"
             "格式: 金额 备注\n"
@@ -131,9 +151,14 @@ async def handle_report_callback(update: Update, context: ContextTypes.DEFAULT_T
                 total += r['amount']
             msg += f"\n总计: {total:.2f}\n"
 
-        keyboard = [
-            [InlineKeyboardButton(
-                "➕ 添加开销", callback_data="report_add_expense_other")],
+        keyboard = []
+        
+        # 只有有权限的用户才显示添加开销按钮
+        if await _check_expense_permission(user_id):
+            keyboard.append([InlineKeyboardButton(
+                "➕ 添加开销", callback_data="report_add_expense_other")])
+        
+        keyboard.extend([
             [
                 InlineKeyboardButton(
                     "📅 本月", callback_data="report_expense_month_other"),
@@ -142,7 +167,7 @@ async def handle_report_callback(update: Update, context: ContextTypes.DEFAULT_T
             ],
             [InlineKeyboardButton(
                 "🔙 返回", callback_data="report_view_today_ALL")]
-        ]
+        ])
         await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
@@ -186,6 +211,16 @@ async def handle_report_callback(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     if data == "report_add_expense_other":
+        # 检查权限：只有管理员或授权员工可以录入开销
+        user_id = update.effective_user.id if update.effective_user else None
+        if not user_id:
+            await query.answer("❌ 无法获取用户信息", show_alert=True)
+            return
+        
+        if not await _check_expense_permission(user_id):
+            await query.answer("❌ 您没有权限录入开销（仅限员工和管理员）", show_alert=True)
+            return
+        
         await query.message.reply_text(
             "📝 请输入金额和备注：\n"
             "格式: 金额 备注\n"
@@ -337,14 +372,17 @@ async def handle_report_callback(update: Update, context: ContextTypes.DEFAULT_T
                     "📅 月报", callback_data=f"report_view_month_{group_id if group_id else 'ALL'}"),
                 InlineKeyboardButton(
                     "📆 日期查询", callback_data=f"report_view_query_{group_id if group_id else 'ALL'}")
-            ],
-            [
+            ]
+        ]
+        
+        # 只有有权限的用户才显示开销按钮
+        if await _check_expense_permission(user_id):
+            keyboard.append([
                 InlineKeyboardButton(
                     "🏢 公司开销", callback_data="report_record_company"),
                 InlineKeyboardButton(
                     "📝 其他开销", callback_data="report_record_other")
-            ]
-        ]
+            ])
 
         # 全局视图添加通用按钮（但用户有权限限制时不显示）
         if not group_id and not user_group_id:
@@ -382,14 +420,17 @@ async def handle_report_callback(update: Update, context: ContextTypes.DEFAULT_T
                     "📄 今日报表", callback_data=f"report_view_today_{group_id if group_id else 'ALL'}"),
                 InlineKeyboardButton(
                     "📆 日期查询", callback_data=f"report_view_query_{group_id if group_id else 'ALL'}")
-            ],
-            [
+            ]
+        ]
+        
+        # 只有有权限的用户才显示开销按钮
+        if await _check_expense_permission(user_id):
+            keyboard.append([
                 InlineKeyboardButton(
                     "🏢 公司开销", callback_data="report_record_company"),
                 InlineKeyboardButton(
                     "📝 其他开销", callback_data="report_record_other")
-            ]
-        ]
+            ])
         await query.edit_message_text(report_text, reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif view_type == 'query':
