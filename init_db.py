@@ -249,6 +249,18 @@ def init_database():
     )
     ''')
 
+    # 创建开销记录表
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS expense_records (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        type TEXT NOT NULL,
+        amount REAL NOT NULL,
+        note TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+
     conn.commit()
     conn.close()
     print(f"数据库 {DB_NAME} 初始化完成！")
