@@ -11,7 +11,7 @@ async def update_liquid_capital(amount: float):
     await db_operations.update_daily_data(date, 'liquid_flow', amount, None)
 
 
-async def update_all_stats(field: str, amount: float, count: int = 0, group_id: str = None):
+async def update_all_stats(field: str, amount: float, count: int = 0, group_id: str = None, skip_daily: bool = False):
     """统一更新所有统计数据（全局、日结、分组）"""
     if amount != 0:
         global_amount_field = field if field.endswith('_amount') or field in [
@@ -26,7 +26,7 @@ async def update_all_stats(field: str, amount: float, count: int = 0, group_id: 
     is_daily_field = any(field.startswith(prefix)
                          for prefix in DAILY_ALLOWED_PREFIXES)
 
-    if is_daily_field:
+    if is_daily_field and not skip_daily:
         date = get_daily_period_date()
         if amount != 0:
             daily_amount_field = field if field.endswith(

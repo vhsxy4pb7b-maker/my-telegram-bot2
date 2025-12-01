@@ -149,7 +149,7 @@ async def update_order_state_from_title(update: Update, context: ContextTypes.DE
 
         is_current_breach = current_state == 'breach'
         is_target_breach = target_state == 'breach'
-        
+
         is_target_end = target_state == 'end'
         is_target_breach_end = target_state == 'breach_end'
 
@@ -162,13 +162,15 @@ async def update_order_state_from_title(update: Update, context: ContextTypes.DE
         if is_target_end:
             # 只能从 normal 或 overdue 转换到 end
             if not is_current_valid:
-                logger.info(f"订单 {order_id} 当前状态为 {current_state}，不能直接变更为 end（只能从 normal/overdue 转换）")
+                logger.info(
+                    f"订单 {order_id} 当前状态为 {current_state}，不能直接变更为 end（只能从 normal/overdue 转换）")
                 return
-        
+
         if is_target_breach_end:
             # 只能从 breach 转换到 breach_end
             if not is_current_breach:
-                logger.info(f"订单 {order_id} 当前状态为 {current_state}，不能直接变更为 breach_end（只能从 breach 转换）")
+                logger.info(
+                    f"订单 {order_id} 当前状态为 {current_state}，不能直接变更为 breach_end（只能从 breach 转换）")
                 return
 
         # 更新数据库状态
@@ -307,8 +309,14 @@ async def try_create_order_from_title(update: Update, context: ContextTypes.DEFA
     is_initial_breach = (initial_state == 'breach')
 
     # 更新订单统计
+    # 历史违约订单：只更新全局和分组统计，不更新日结统计
     if is_initial_breach:
-        await update_all_stats('breach', amount, 1, group_id)
+        if is_historical:
+            # 历史违约订单：跳过日结更新
+            await update_all_stats('breach', amount, 1, group_id, skip_daily=True)
+        else:
+            # 非历史违约订单：正常更新（包括日结）
+            await update_all_stats('breach', amount, 1, group_id)
     else:
         await update_all_stats('valid', amount, 1, group_id)
 
