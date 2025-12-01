@@ -17,29 +17,26 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 获取用户ID
     user_id = update.effective_user.id if update.effective_user else None
-    
+
     # 对于报表回调，允许受限用户使用（只要他们有 user_group_id）
     if data.startswith("report_"):
         # 报表回调允许受限用户使用，权限检查在 handle_report_callback 内部进行
-        try:
-            await query.answer()
-        except Exception:
-            pass
+        # 注意：query.answer() 在 handle_report_callback 内部调用，这里不需要调用
         await handle_report_callback(update, context)
         return
-    
+
     # 其他回调需要授权（管理员或员工）
     from decorators import authorized_required
-    
+
     # 检查是否是管理员或授权员工
     if not user_id:
         await query.answer("❌ 无法获取用户信息", show_alert=True)
         return
-    
+
     from config import ADMIN_IDS
     is_admin = user_id in ADMIN_IDS
     is_authorized = await db_operations.is_user_authorized(user_id)
-    
+
     if not is_admin and not is_authorized:
         await query.answer("⚠️ Permission denied.", show_alert=True)
         return

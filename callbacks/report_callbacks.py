@@ -167,11 +167,7 @@ async def handle_report_callback(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     if data == "report_record_other":
-        # query.answer() 已在 button_callback 中调用，这里不需要再次调用
-        try:
-            await query.answer()
-        except Exception:
-            pass  # 忽略重复调用的错误
+        await query.answer()
         date = get_daily_period_date()
         records = await db_operations.get_expense_records(date, date, 'other')
 
