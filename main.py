@@ -215,6 +215,8 @@ def main() -> None:
         "update_weekday_groups", private_chat_only(admin_required(update_weekday_groups))))
     application.add_handler(CommandHandler(
         "fix_statistics", private_chat_only(admin_required(fix_statistics))))
+    application.add_handler(CommandHandler(
+        "find_tail_orders", private_chat_only(admin_required(find_tail_orders))))
 
     # 自动订单创建（新成员入群监听 & 群名变更监听）
     application.add_handler(MessageHandler(

@@ -439,6 +439,170 @@ async def fix_statistics(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @admin_required
 @private_chat_only
+async def find_tail_orders(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """查找导致有效金额尾数的订单（管理员命令）"""
+    try:
+        msg = await update.message.reply_text("🔍 正在分析有效金额尾数...")
+
+        # 获取所有有效订单（包含所有状态，用于完整分析）
+        all_valid_orders = await db_operations.search_orders_advanced({})
+        all_orders_all_states = await db_operations.search_orders_advanced_all_states({})
+
+        # 计算实际有效金额（从订单表）
+        actual_valid_amount = sum(order.get('amount', 0)
+                                  for order in all_valid_orders)
+
+        # 获取统计表中的有效金额
+        financial_data = await db_operations.get_financial_data()
+        stats_valid_amount = financial_data['valid_amount']
+
+        # 查找所有非整千数订单
+        non_thousand_orders = []
+        tail_6_orders = []
+        tail_distribution = {}  # 尾数分布统计
+
+        for order in all_valid_orders:
+            amount = order.get('amount', 0)
+            if amount % 1000 != 0:
+                tail = int(amount % 1000)
+                non_thousand_orders.append((order, tail))
+                if tail not in tail_distribution:
+                    tail_distribution[tail] = []
+                tail_distribution[tail].append(order)
+                if tail == 6:
+                    tail_6_orders.append(order)
+
+        # 按归属ID分组分析
+        group_analysis = {}
+        all_group_ids = list(set(order.get('group_id')
+                             for order in all_valid_orders if order.get('group_id')))
+
+        for group_id in sorted(all_group_ids):
+            group_orders = [o for o in all_valid_orders if o.get(
+                'group_id') == group_id]
+            group_amount = sum(o.get('amount', 0) for o in group_orders)
+            group_tail = int(group_amount % 1000)
+            group_non_thousand = [
+                o for o in group_orders if o.get('amount', 0) % 1000 != 0]
+
+            grouped_data = await db_operations.get_grouped_data(group_id)
+            stats_group_amount = grouped_data.get('valid_amount', 0)
+            stats_group_tail = int(stats_group_amount % 1000)
+
+            group_analysis[group_id] = {
+                'orders': group_orders,
+                'actual_amount': group_amount,
+                'actual_tail': group_tail,
+                'stats_amount': stats_group_amount,
+                'stats_tail': stats_group_tail,
+                'non_thousand': group_non_thousand
+            }
+
+        # 构建结果消息
+        result_msg = "🔍 有效金额尾数分析报告\n\n"
+        result_msg += f"📊 总体统计：\n"
+        result_msg += f"有效订单数: {len(all_valid_orders)}\n"
+        result_msg += f"实际有效金额: {actual_valid_amount:,.2f}\n"
+        result_msg += f"统计有效金额: {stats_valid_amount:,.2f}\n"
+        result_msg += f"差异: {stats_valid_amount - actual_valid_amount:,.2f}\n\n"
+
+        # 分析总金额尾数
+        actual_tail = int(actual_valid_amount % 1000)
+        stats_tail = int(stats_valid_amount % 1000)
+
+        if actual_tail == 6:
+            result_msg += f"⚠️ 实际有效金额尾数是 6\n"
+        elif stats_tail == 6:
+            result_msg += f"⚠️ 统计有效金额尾数是 6（但实际尾数是 {actual_tail}）\n"
+            result_msg += f"   说明统计数据不一致，建议运行 /fix_statistics\n\n"
+        else:
+            result_msg += f"✅ 总金额尾数: 实际={actual_tail}, 统计={stats_tail}\n\n"
+
+        # 显示尾数为6的订单
+        if tail_6_orders:
+            result_msg += f"⚠️ 发现 {len(tail_6_orders)} 个尾数为 6 的订单：\n\n"
+            for order in tail_6_orders:
+                result_msg += (
+                    f"订单ID: {order.get('order_id')}\n"
+                    f"金额: {order.get('amount'):,.2f}\n"
+                    f"状态: {order.get('state')}\n"
+                    f"归属: {order.get('group_id')}\n"
+                    f"日期: {order.get('date')}\n"
+                    f"客户: {order.get('customer', 'N/A')}\n\n"
+                )
+        else:
+            result_msg += "✅ 没有找到尾数为 6 的订单\n\n"
+
+        # 按归属ID分组显示
+        result_msg += f"📋 按归属ID分组分析：\n\n"
+        for group_id in sorted(all_group_ids):
+            analysis = group_analysis[group_id]
+            result_msg += f"{group_id}:\n"
+            result_msg += f"  实际金额: {analysis['actual_amount']:,.2f} (尾数: {analysis['actual_tail']})\n"
+            result_msg += f"  统计金额: {analysis['stats_amount']:,.2f} (尾数: {analysis['stats_tail']})\n"
+
+            if analysis['actual_tail'] == 6 or analysis['stats_tail'] == 6:
+                result_msg += f"  ⚠️ 该归属ID导致尾数6！\n"
+
+            if analysis['non_thousand']:
+                result_msg += f"  非整千数订单: {len(analysis['non_thousand'])} 个\n"
+                for order in analysis['non_thousand'][:3]:
+                    amount = order.get('amount', 0)
+                    tail = int(amount % 1000)
+                    result_msg += f"    - {order.get('order_id')}: {amount:,.2f} (尾数: {tail})\n"
+                if len(analysis['non_thousand']) > 3:
+                    result_msg += f"    ... 还有 {len(analysis['non_thousand']) - 3} 个\n"
+            result_msg += "\n"
+
+        # 尾数分布统计
+        if tail_distribution:
+            result_msg += f"📊 尾数分布统计：\n"
+            for tail in sorted(tail_distribution.keys()):
+                count = len(tail_distribution[tail])
+                total = sum(o.get('amount', 0)
+                            for o in tail_distribution[tail])
+                result_msg += f"  尾数 {tail}: {count} 个订单, 总金额: {total:,.2f}\n"
+            result_msg += "\n"
+
+        # 可能的原因分析
+        if stats_tail == 6 and actual_tail != 6:
+            result_msg += "💡 原因分析：\n"
+            result_msg += "统计金额尾数为6，但实际订单金额尾数不是6\n"
+            result_msg += "说明统计数据与实际订单数据不一致\n"
+            result_msg += "建议：运行 /fix_statistics 修复统计数据\n"
+        elif actual_tail == 6:
+            result_msg += "💡 原因分析：\n"
+            if tail_6_orders:
+                result_msg += f"找到 {len(tail_6_orders)} 个订单金额尾数为6\n"
+                result_msg += "可能原因：\n"
+                result_msg += "1. 订单创建时输入了非整千数金额\n"
+                result_msg += "2. 执行了本金减少操作（+<金额>b），减少的金额不是整千数\n"
+                result_msg += "3. 例如：订单原金额10000，执行+9994b后，剩余金额为6\n"
+            else:
+                result_msg += "未找到尾数为6的订单，但总金额尾数是6\n"
+                result_msg += "可能是多个订单的尾数累加导致的\n"
+
+        # 如果消息太长，分段发送
+        if len(result_msg) > 4000:
+            # 发送第一部分
+            await msg.edit_text(result_msg[:4000])
+            # 发送剩余部分
+            remaining = result_msg[4000:]
+            while len(remaining) > 4000:
+                await update.message.reply_text(remaining[:4000])
+                remaining = remaining[4000:]
+            if remaining:
+                await update.message.reply_text(remaining)
+        else:
+            await msg.edit_text(result_msg)
+
+    except Exception as e:
+        logger.error(f"查找尾数订单时出错: {e}", exc_info=True)
+        await update.message.reply_text(f"❌ 查找失败: {str(e)}")
+
+
+@admin_required
+@private_chat_only
 async def list_employees(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """列出所有员工"""
     users = await db_operations.get_authorized_users()
