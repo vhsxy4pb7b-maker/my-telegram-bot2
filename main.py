@@ -22,6 +22,7 @@ from handlers import (
     list_employees,
     update_weekday_groups,
     fix_statistics,
+    find_tail_orders,
     set_normal,
     set_overdue,
     set_end,

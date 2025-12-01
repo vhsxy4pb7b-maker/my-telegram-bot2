@@ -10,7 +10,8 @@ from .command_handlers import (
     remove_employee,
     list_employees,
     update_weekday_groups,
-    fix_statistics
+    fix_statistics,
+    find_tail_orders
 )
 from .order_handlers import (
     set_normal,
@@ -54,6 +55,7 @@ __all__ = [
     'list_employees',
     'update_weekday_groups',
     'fix_statistics',
+    'find_tail_orders',
     'set_normal',
     'set_overdue',
     'set_end',
