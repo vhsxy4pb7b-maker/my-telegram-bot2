@@ -71,8 +71,15 @@ async def format_income_detail(record: dict) -> str:
     # 获取订单号
     order_id = record.get('order_id') or '无'
 
-    # 格式化金额
-    amount_str = f"{record['amount']:,.2f}"
+    # 格式化金额（处理 None 和 0 的情况）
+    amount = record.get('amount')
+    if amount is None:
+        amount_str = "NULL"
+    else:
+        try:
+            amount_str = f"{float(amount):,.2f}"
+        except (ValueError, TypeError):
+            amount_str = "错误"
 
     # 格式：时间  订单号  金额（对齐显示，不使用分隔符）
     # 时间：8字符（HH:MM:SS），订单号：25字符，金额：15字符
@@ -105,8 +112,8 @@ async def generate_income_report(records: list, start_date: str, end_date: str,
             by_type[type_name] = []
         by_type[type_name].append(record)
 
-    # 计算总计
-    total_amount = sum(r['amount'] for r in records)
+    # 计算总计（处理 None 值）
+    total_amount = sum(r.get('amount', 0) or 0 for r in records)
 
     # 生成报表文本
     report = f"💰 {title}\n"
@@ -135,7 +142,7 @@ async def generate_income_report(records: list, start_date: str, end_date: str,
         # 按录入时间正序排序（最早录入的在前）
         type_records.sort(key=lambda x: x.get('created_at', '') or '')
 
-        type_total = sum(r['amount'] for r in type_records)
+        type_total = sum(r.get('amount', 0) or 0 for r in type_records)
         type_count = len(type_records)
 
         report += f"【{type_name}】总计: {type_total:,.2f} ({type_count}笔)\n"
@@ -177,7 +184,7 @@ async def generate_income_report(records: list, start_date: str, end_date: str,
             # 按录入时间正序排序（最早录入的在前）
             type_records.sort(key=lambda x: x.get('created_at', '') or '')
 
-            type_total = sum(r['amount'] for r in type_records)
+            type_total = sum(r.get('amount', 0) or 0 for r in type_records)
             type_count = len(type_records)
 
             report += f"【{type_name}】总计: {type_total:,.2f} ({type_count}笔)\n"
