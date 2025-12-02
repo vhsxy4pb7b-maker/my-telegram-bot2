@@ -483,13 +483,332 @@ async def handle_report_callback(update: Update, context: ContextTypes.DEFAULT_T
                 InlineKeyboardButton("利息收入", callback_data="income_type_interest"),
                 InlineKeyboardButton("本金减少", callback_data="income_type_principal_reduction")
             ],
+            [
+                InlineKeyboardButton("🔍 高级查询", callback_data="income_advanced_query")
+            ],
             [InlineKeyboardButton("🔙 返回", callback_data="income_view_today")]
         ]
         
         await query.edit_message_text(
-            "🔍 请选择要查询的收入类型：",
+            "🔍 请选择要查询的收入类型：\n\n或者使用高级查询进行多条件筛选",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
+        return
+    
+    if data == "income_advanced_query":
+        if not user_id or user_id not in ADMIN_IDS:
+            await query.answer("❌ 此功能仅限管理员使用", show_alert=True)
+            return
+        
+        await query.answer()
+        # 初始化查询条件
+        context.user_data['income_query'] = {
+            'date': None,
+            'type': None,
+            'group_id': None
+        }
+        
+        keyboard = [
+            [InlineKeyboardButton("📅 选择日期", callback_data="income_query_step_date")],
+            [InlineKeyboardButton("🔙 返回", callback_data="income_view_by_type")]
+        ]
+        
+        await query.edit_message_text(
+            "🔍 高级查询\n\n"
+            "请逐步选择查询条件：\n"
+            "1️⃣ 日期（必选）\n"
+            "2️⃣ 收入类型（可选）\n"
+            "3️⃣ 归属ID/群名（可选）\n\n"
+            "当前状态：未设置",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    if data == "income_query_step_date":
+        if not user_id or user_id not in ADMIN_IDS:
+            await query.answer("❌ 此功能仅限管理员使用", show_alert=True)
+            return
+        
+        await query.answer()
+        await query.message.reply_text(
+            "📅 请输入查询日期：\n"
+            "格式: YYYY-MM-DD\n"
+            "示例: 2025-12-02\n"
+            "输入 'cancel' 取消\n\n"
+            "或输入日期范围（用空格分隔）：\n"
+            "示例: 2025-12-01 2025-12-31"
+        )
+        context.user_data['state'] = 'INCOME_QUERY_DATE'
+        return
+    
+    if data.startswith("income_query_step_type_"):
+        if not user_id or user_id not in ADMIN_IDS:
+            await query.answer("❌ 此功能仅限管理员使用", show_alert=True)
+            return
+        
+        await query.answer()
+        # 保存日期
+        date_str = data.replace("income_query_step_type_", "")
+        context.user_data['income_query']['date'] = date_str
+        
+        # 选择类型
+        keyboard = [
+            [
+                InlineKeyboardButton("订单完成", callback_data=f"income_query_type_completed_{date_str}"),
+                InlineKeyboardButton("违约完成", callback_data=f"income_query_type_breach_end_{date_str}")
+            ],
+            [
+                InlineKeyboardButton("利息收入", callback_data=f"income_query_type_interest_{date_str}"),
+                InlineKeyboardButton("本金减少", callback_data=f"income_query_type_principal_reduction_{date_str}")
+            ],
+            [
+                InlineKeyboardButton("全部类型", callback_data=f"income_query_type_all_{date_str}")
+            ],
+            [InlineKeyboardButton("🔙 返回", callback_data="income_advanced_query")]
+        ]
+        
+        await query.edit_message_text(
+            f"📅 已选择日期: {date_str}\n\n"
+            "🔍 请选择收入类型：",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    if data.startswith("income_query_type_"):
+        if not user_id or user_id not in ADMIN_IDS:
+            await query.answer("❌ 此功能仅限管理员使用", show_alert=True)
+            return
+        
+        await query.answer()
+        # 解析参数: income_query_type_{type}_{date}
+        parts = data.replace("income_query_type_", "").split("_", 1)
+        income_type = parts[0]
+        date_str = parts[1] if len(parts) > 1 else context.user_data.get('income_query', {}).get('date')
+        
+        # 保存类型（如果是 all，设为 None）
+        if income_type == 'all':
+            context.user_data['income_query']['type'] = None
+            income_type = None
+        else:
+            context.user_data['income_query']['type'] = income_type
+        
+        # 获取所有归属ID
+        all_group_ids = await db_operations.get_all_group_ids()
+        
+        keyboard = []
+        row = []
+        for gid in sorted(all_group_ids):
+            row.append(InlineKeyboardButton(
+                gid, 
+                callback_data=f"income_query_group_{gid}_{income_type or 'all'}_{date_str}"
+            ))
+            if len(row) == 4:
+                keyboard.append(row)
+                row = []
+        if row:
+            keyboard.append(row)
+        
+        # 添加"全部"和"全局"选项
+        keyboard.append([
+            InlineKeyboardButton("全部归属ID", callback_data=f"income_query_group_all_{income_type or 'all'}_{date_str}"),
+            InlineKeyboardButton("全局", callback_data=f"income_query_group_null_{income_type or 'all'}_{date_str}")
+        ])
+        
+        keyboard.append([InlineKeyboardButton("🔙 返回", callback_data=f"income_query_step_type_{date_str}")])
+        
+        type_display = {
+            'completed': '订单完成',
+            'breach_end': '违约完成',
+            'interest': '利息收入',
+            'principal_reduction': '本金减少'
+        }.get(income_type, '全部类型') if income_type else '全部类型'
+        
+        await query.edit_message_text(
+            f"📅 日期: {date_str}\n"
+            f"🔍 类型: {type_display}\n\n"
+            "📋 请选择归属ID/群名：",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    if data.startswith("income_query_group_"):
+        if not user_id or user_id not in ADMIN_IDS:
+            await query.answer("❌ 此功能仅限管理员使用", show_alert=True)
+            return
+        
+        await query.answer()
+        # 解析参数: income_query_group_{group_id}_{type}_{date}
+        parts = data.replace("income_query_group_", "").split("_")
+        group_id = parts[0]
+        income_type = parts[1] if len(parts) > 1 else 'all'
+        date_str = parts[2] if len(parts) > 2 else context.user_data.get('income_query', {}).get('date')
+        
+        # 处理 group_id
+        # 'all' 表示所有归属ID（包括NULL），查询时不过滤group_id
+        # 'null' 表示只查询全局（group_id IS NULL）
+        # 其他值表示查询特定归属ID
+        
+        if group_id == 'all':
+            final_group = None  # 不过滤，查询所有
+        elif group_id == 'null':
+            final_group = 'NULL_SPECIAL'  # 特殊标记，稍后处理为 IS NULL
+        else:
+            final_group = group_id  # 具体归属ID
+        
+        # 保存并执行查询
+        final_type = None if income_type == 'all' else income_type
+        
+        # 解析日期范围
+        dates = date_str.split()
+        if len(dates) == 1:
+            start_date = end_date = dates[0]
+        elif len(dates) == 2:
+            start_date = dates[0]
+            end_date = dates[1]
+        else:
+            start_date = end_date = get_daily_period_date()
+        
+        # 查询记录
+        # 如果 final_group 是 'NULL_SPECIAL'，需要特殊处理（查询 group_id IS NULL）
+        if final_group == 'NULL_SPECIAL':
+            # 查询所有记录，然后过滤出 group_id 为 NULL 的
+            all_records = await db_operations.get_income_records(
+                start_date, end_date, 
+                type=final_type,
+                group_id=None  # 先不过滤 group_id
+            )
+            records = [r for r in all_records if r.get('group_id') is None]
+        else:
+            records = await db_operations.get_income_records(
+                start_date, end_date, 
+                type=final_type, 
+                group_id=final_group
+            )
+        
+        from handlers.income_handlers import generate_income_report
+        INCOME_TYPES = {"completed": "订单完成", "breach_end": "违约完成", 
+                       "interest": "利息收入", "principal_reduction": "本金减少"}
+        
+        type_name = INCOME_TYPES.get(final_type, "全部类型") if final_type else "全部类型"
+        if final_group == 'NULL_SPECIAL':
+            group_name = "全局"
+        elif final_group:
+            group_name = final_group
+        else:
+            group_name = "全部"
+        
+        title = f"收入明细查询"
+        if start_date == end_date:
+            title += f" ({start_date})"
+        else:
+            title += f" ({start_date} 至 {end_date})"
+        title += f"\n类型: {type_name} | 归属ID: {group_name}"
+        
+        report, has_more, total_pages, current_type = await generate_income_report(
+            records, start_date, end_date, title, page=1, income_type=final_type
+        )
+        
+        keyboard = []
+        
+        # 如果有分页，添加分页按钮
+        if has_more and total_pages > 1:
+            page_data = f"{final_type or 'all'}_{final_group or 'all' if final_group else 'all'}_{start_date}_{end_date}"
+            keyboard.append([InlineKeyboardButton("下一页 ▶️", callback_data=f"income_adv_page_{page_data}_2")])
+        
+        keyboard.append([InlineKeyboardButton("🔙 返回高级查询", callback_data="income_advanced_query")])
+        
+        try:
+            await query.edit_message_text(report, reply_markup=InlineKeyboardMarkup(keyboard))
+        except Exception as e:
+            logger.error(f"编辑收入明细消息失败: {e}", exc_info=True)
+            await query.message.reply_text(report, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
+    # 处理高级查询分页
+    if data.startswith("income_adv_page_"):
+        if not user_id or user_id not in ADMIN_IDS:
+            await query.answer("❌ 此功能仅限管理员使用", show_alert=True)
+            return
+        
+        await query.answer()
+        # 解析: income_adv_page_{type}_{group}_{start_date}_{end_date}_{page}
+        parts = data.replace("income_adv_page_", "").split("_")
+        if len(parts) >= 6:
+            page = int(parts[-1])
+            end_date = parts[-2]
+            start_date = parts[-3]
+            group_key = parts[-4]
+            type_key = parts[-5]
+            
+            final_type = None if type_key == 'all' else type_key
+            
+            # 处理 group_id
+            if group_key == 'all':
+                final_group = None  # 不过滤
+            elif group_key == 'NULL':
+                final_group = 'NULL_SPECIAL'  # 特殊标记
+            else:
+                final_group = group_key
+            
+            # 查询记录
+            if final_group == 'NULL_SPECIAL':
+                all_records = await db_operations.get_income_records(
+                    start_date, end_date, 
+                    type=final_type,
+                    group_id=None
+                )
+                records = [r for r in all_records if r.get('group_id') is None]
+            else:
+                records = await db_operations.get_income_records(
+                    start_date, end_date, 
+                    type=final_type, 
+                    group_id=final_group
+                )
+            
+            from handlers.income_handlers import generate_income_report
+            INCOME_TYPES = {"completed": "订单完成", "breach_end": "违约完成", 
+                           "interest": "利息收入", "principal_reduction": "本金减少"}
+            
+            type_name = INCOME_TYPES.get(final_type, "全部类型") if final_type else "全部类型"
+            if final_group == 'NULL_SPECIAL':
+                group_name = "全局"
+            elif final_group:
+                group_name = final_group
+            else:
+                group_name = "全部"
+            
+            title = f"收入明细查询"
+            if start_date == end_date:
+                title += f" ({start_date})"
+            else:
+                title += f" ({start_date} 至 {end_date})"
+            title += f"\n类型: {type_name} | 归属ID: {group_name}"
+            
+            report, has_more_pages, total_pages, current_type = await generate_income_report(
+                records, start_date, end_date, title, page=page, income_type=final_type
+            )
+            
+            keyboard = []
+            page_buttons = []
+            
+            if page > 1:
+                page_data = f"{final_type or 'all'}_{final_group or 'all' if final_group else 'all'}_{start_date}_{end_date}"
+                page_buttons.append(InlineKeyboardButton("◀️ 上一页", callback_data=f"income_adv_page_{page_data}_{page - 1}"))
+            
+            if has_more_pages and page < total_pages:
+                page_data = f"{final_type or 'all'}_{final_group or 'all' if final_group else 'all'}_{start_date}_{end_date}"
+                page_buttons.append(InlineKeyboardButton("下一页 ▶️", callback_data=f"income_adv_page_{page_data}_{page + 1}"))
+            
+            if page_buttons:
+                keyboard.append(page_buttons)
+            
+            keyboard.append([InlineKeyboardButton("🔙 返回高级查询", callback_data="income_advanced_query")])
+            
+            try:
+                await query.edit_message_text(report, reply_markup=InlineKeyboardMarkup(keyboard))
+            except Exception as e:
+                logger.error(f"编辑收入明细消息失败: {e}", exc_info=True)
+                await query.message.reply_text(report, reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
     if data.startswith("income_type_"):
