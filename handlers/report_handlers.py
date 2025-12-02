@@ -26,6 +26,13 @@ async def generate_report_text(period_type: str, start_date: str, end_date: str,
     # 获取周期统计数据
     stats = await db_operations.get_stats_by_date_range(
         start_date, end_date, group_id)
+    
+    # 从收入明细表获取实际利息收入（确保与明细一致）
+    interest_records = await db_operations.get_income_records(
+        start_date, end_date, type='interest', group_id=group_id)
+    actual_interest = sum(r['amount'] for r in interest_records)
+    # 使用实际收入明细的利息，而不是统计表的利息
+    stats['interest'] = actual_interest
 
     # 如果按归属ID查询，需要单独获取全局开销数据（开销是全局的，不按归属ID存储）
     if group_id:
