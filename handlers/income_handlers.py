@@ -222,7 +222,9 @@ async def show_income_detail(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if has_more and total_pages > 1:
         page_buttons = []
         if total_pages > 1:
-            page_buttons.append(InlineKeyboardButton("下一页 ▶️", callback_data=f"income_page_{current_type}_2"))
+            # 使用 | 作为分隔符，避免日期中的连字符干扰
+            date = get_daily_period_date()
+            page_buttons.append(InlineKeyboardButton("下一页 ▶️", callback_data=f"income_page_{current_type}|2|{date}|{date}"))
         keyboard.append(page_buttons)
     
     keyboard.extend([
@@ -286,7 +288,7 @@ async def handle_income_query_input(update: Update, context: ContextTypes.DEFAUL
         
         # 如果有分页，添加分页按钮
         if has_more and total_pages > 1:
-            keyboard.append([InlineKeyboardButton("下一页 ▶️", callback_data=f"income_page_{current_type}_2_{start_date}_{end_date}")])
+            keyboard.append([InlineKeyboardButton("下一页 ▶️", callback_data=f"income_page_{current_type}|2|{start_date}|{end_date}")])
         
         keyboard.append([InlineKeyboardButton("🔙 返回", callback_data="income_view_today")])
         await update.message.reply_text(report, reply_markup=InlineKeyboardMarkup(keyboard))

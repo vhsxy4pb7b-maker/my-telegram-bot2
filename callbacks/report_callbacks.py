@@ -394,7 +394,7 @@ async def handle_report_callback(update: Update, context: ContextTypes.DEFAULT_T
         # 如果有分页，添加分页按钮
         if has_more and total_pages > 1:
             keyboard.append([InlineKeyboardButton(
-                "下一页 ▶️", callback_data=f"income_page_{current_type}_2_{date}_{date}")])
+                "下一页 ▶️", callback_data=f"income_page_{current_type}|2|{date}|{date}")])
 
         keyboard.extend([
             [
@@ -442,7 +442,7 @@ async def handle_report_callback(update: Update, context: ContextTypes.DEFAULT_T
         # 如果有分页，添加分页按钮
         if has_more and total_pages > 1:
             keyboard.append([InlineKeyboardButton(
-                "下一页 ▶️", callback_data=f"income_page_{current_type}_2_{start_date}_{end_date}")])
+                "下一页 ▶️", callback_data=f"income_page_{current_type}|2|{start_date}|{end_date}")])
 
         keyboard.extend([
             [
@@ -866,7 +866,7 @@ async def handle_report_callback(update: Update, context: ContextTypes.DEFAULT_T
         # 如果有分页，添加分页按钮
         if has_more and total_pages > 1:
             keyboard.append([InlineKeyboardButton(
-                "下一页 ▶️", callback_data=f"income_page_{income_type}_2_{date}_{date}")])
+                "下一页 ▶️", callback_data=f"income_page_{income_type}|2|{date}|{date}")])
 
         keyboard.append([InlineKeyboardButton(
             "🔙 返回", callback_data="income_view_today")])
@@ -885,22 +885,60 @@ async def handle_report_callback(update: Update, context: ContextTypes.DEFAULT_T
 
         await query.answer()
 
-        # 解析分页参数: income_page_{type}_{page}_{start_date}_{end_date}
-        parts = data.replace("income_page_", "").split("_")
-        if len(parts) < 2:
-            await query.answer("❌ 分页参数错误", show_alert=True)
-            return
-
-        income_type = parts[0]
-        page = int(parts[1])
-
-        # 解析日期
-        if len(parts) >= 4:
-            start_date = parts[2]
-            end_date = parts[3]
+        # 解析分页参数: income_page_{type}|{page}|{start_date}|{end_date}
+        # 使用 | 作为分隔符，避免日期中的连字符干扰
+        param_str = data.replace("income_page_", "")
+        
+        # 兼容旧格式（使用 _ 分隔）和新格式（使用 | 分隔）
+        if "|" in param_str:
+            # 新格式：使用 | 分隔
+            parts = param_str.split("|")
+            if len(parts) < 2:
+                await query.answer("❌ 分页参数错误", show_alert=True)
+                return
+            
+            income_type = parts[0]
+            page = int(parts[1])
+            
+            # 解析日期
+            if len(parts) >= 4:
+                start_date = parts[2]
+                end_date = parts[3]
+            else:
+                # 如果没有日期，使用今日
+                start_date = end_date = get_daily_period_date()
         else:
-            # 如果没有日期，使用今日
-            start_date = end_date = get_daily_period_date()
+            # 旧格式兼容：尝试用 _ 分隔（可能日期会被分割）
+            parts = param_str.split("_")
+            if len(parts) < 2:
+                await query.answer("❌ 分页参数错误", show_alert=True)
+                return
+            
+            income_type = parts[0]
+            try:
+                page = int(parts[1])
+            except (ValueError, IndexError):
+                await query.answer("❌ 分页参数错误", show_alert=True)
+                return
+            
+            # 尝试解析日期（旧格式日期可能被分割）
+            if len(parts) >= 8:
+                # 格式可能是: type_page_year_month_day_year_month_day
+                try:
+                    start_date = f"{parts[2]}-{parts[3].zfill(2)}-{parts[4].zfill(2)}"
+                    end_date = f"{parts[5]}-{parts[6].zfill(2)}-{parts[7].zfill(2)}"
+                except (ValueError, IndexError):
+                    start_date = end_date = get_daily_period_date()
+            elif len(parts) >= 4:
+                # 尝试简单解析
+                try:
+                    start_date = parts[2] if len(parts[2]) == 10 else get_daily_period_date()
+                    end_date = parts[3] if len(parts[3]) == 10 else start_date
+                except IndexError:
+                    start_date = end_date = get_daily_period_date()
+            else:
+                # 没有日期，使用今日
+                start_date = end_date = get_daily_period_date()
 
         # 获取记录
         records = await db_operations.get_income_records(start_date, end_date, type=income_type if income_type != 'None' else None)
@@ -925,11 +963,11 @@ async def handle_report_callback(update: Update, context: ContextTypes.DEFAULT_T
 
         if page > 1:
             page_buttons.append(InlineKeyboardButton(
-                "◀️ 上一页", callback_data=f"income_page_{income_type}_{page - 1}_{start_date}_{end_date}"))
+                "◀️ 上一页", callback_data=f"income_page_{income_type}|{page - 1}|{start_date}|{end_date}"))
 
         if has_more and page < total_pages:
             page_buttons.append(InlineKeyboardButton(
-                "下一页 ▶️", callback_data=f"income_page_{income_type}_{page + 1}_{start_date}_{end_date}"))
+                "下一页 ▶️", callback_data=f"income_page_{income_type}|{page + 1}|{start_date}|{end_date}"))
 
         if page_buttons:
             keyboard.append(page_buttons)
