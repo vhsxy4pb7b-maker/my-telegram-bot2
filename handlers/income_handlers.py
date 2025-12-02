@@ -32,39 +32,39 @@ async def format_income_detail(record: dict) -> str:
     if record.get('created_at'):
         try:
             created_at_str = record['created_at']
-            dt = None
             
-            # 尝试多种时间格式
-            # 格式1: ISO格式带时区 (2024-12-02T15:00:00Z 或 2024-12-02T15:00:00+00:00)
+            # 修复日期阈值：2024-12-02（修复代码部署日期）
+            # 在此日期之后创建的记录，已经是北京时间，直接显示
+            # 在此日期之前创建的记录，是UTC时间，需要转换
+            FIX_DEPLOY_DATE = datetime(2024, 12, 2).date()
+            
+            # 解析时间字符串
             if 'T' in created_at_str:
+                # ISO格式
                 try:
                     dt = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
                 except:
-                    # 移除微秒部分再试
                     created_at_str_clean = created_at_str.split('.')[0].split('+')[0].split('Z')[0]
                     dt = datetime.strptime(created_at_str_clean, "%Y-%m-%dT%H:%M:%S")
-                    dt = pytz.utc.localize(dt)
             else:
-                # 格式2: SQLite格式 (2024-12-02 15:00:00)
-                try:
-                    # 尝试带微秒的格式
-                    if '.' in created_at_str:
-                        dt = datetime.strptime(created_at_str.split('.')[0], "%Y-%m-%d %H:%M:%S")
-                    else:
-                        dt = datetime.strptime(created_at_str, "%Y-%m-%d %H:%M:%S")
-                except:
-                    # 尝试其他格式
+                # SQLite格式 (2024-12-02 15:00:00)
+                if '.' in created_at_str:
                     dt = datetime.strptime(created_at_str.split('.')[0], "%Y-%m-%d %H:%M:%S")
+                else:
+                    dt = datetime.strptime(created_at_str, "%Y-%m-%d %H:%M:%S")
             
-            # 如果没有时区信息，假设是UTC（生产环境服务器通常是UTC时区）
-            if dt and dt.tzinfo is None:
-                dt = pytz.utc.localize(dt)
+            # 判断是新数据（北京时间）还是旧数据（UTC）
+            record_date = dt.date()
             
-            if dt:
-                # 转换为北京时间
+            if record_date >= FIX_DEPLOY_DATE:
+                # 新数据：已经是北京时间，直接显示
+                time_str = dt.strftime("%H:%M:%S")
+            else:
+                # 旧数据：是UTC时间，需要转换为北京时间
+                if dt.tzinfo is None:
+                    dt = pytz.utc.localize(dt)
                 tz_beijing = pytz.timezone('Asia/Shanghai')
                 dt_beijing = dt.astimezone(tz_beijing)
-                # 格式化显示
                 time_str = dt_beijing.strftime("%H:%M:%S")
         except Exception as e:
             logger.warning(f"解析时间失败: {record.get('created_at')}, 错误: {e}")
