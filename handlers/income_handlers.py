@@ -74,10 +74,10 @@ async def format_income_detail(record: dict) -> str:
     # 格式化金额
     amount_str = f"{record['amount']:,.2f}"
 
-    # 格式：时间 | 订单号 | 金额（对齐显示）
+    # 格式：时间  订单号  金额（对齐显示，不使用分隔符）
     # 时间：8字符（HH:MM:SS），订单号：25字符，金额：15字符
-    # 使用左对齐，让第一列的第一个字对齐
-    detail = f"{time_str:<8} | {order_id:<25} | {amount_str:>15}"
+    # 使用空格对齐，让竖列对齐
+    detail = f"{time_str:<8}  {order_id:<25}  {amount_str:>15}"
 
     return detail
 
@@ -140,7 +140,7 @@ async def generate_income_report(records: list, start_date: str, end_date: str,
 
         report += f"【{type_name}】总计: {type_total:,.2f} ({type_count}笔)\n"
         report += f"{'─' * 50}\n"
-        report += f"{'时间':<8} | {'订单号':<25} | {'金额':>15}\n"
+        report += f"{'时间':<8}  {'订单号':<25}  {'金额':>15}\n"
         report += f"{'─' * 50}\n"
 
         # 分页处理
@@ -182,7 +182,7 @@ async def generate_income_report(records: list, start_date: str, end_date: str,
 
             report += f"【{type_name}】总计: {type_total:,.2f} ({type_count}笔)\n"
             report += f"{'─' * 50}\n"
-            report += f"{'时间':<8} | {'订单号':<25} | {'金额':>15}\n"
+            report += f"{'时间':<8}  {'订单号':<25}  {'金额':>15}\n"
             report += f"{'─' * 50}\n"
 
             # 如果记录太多，只显示第一页

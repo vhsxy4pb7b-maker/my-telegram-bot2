@@ -981,7 +981,7 @@ async def handle_report_callback(update: Update, context: ContextTypes.DEFAULT_T
             page_buttons.append(InlineKeyboardButton(
                 "◀️ 上一页", callback_data=f"income_page_{income_type}|{page - 1}|{start_date}|{end_date}"))
 
-        if has_more and page < total_pages:
+        if page < total_pages:
             page_buttons.append(InlineKeyboardButton(
                 "下一页 ▶️", callback_data=f"income_page_{income_type}|{page + 1}|{start_date}|{end_date}"))
 
