@@ -70,9 +70,9 @@ async def list_all_income_records(date: str):
         total_amount += type_total
         
         print(f"\n【{type_name}】{len(type_records)} 笔, 总计: {type_total:,.2f} 元")
-        print("-" * 100)
+        print("-" * 120)
         print(f"{'序号':>4} {'金额':>15} | {'订单号':>25} | {'时间':>10}")
-        print("-" * 100)
+        print("-" * 120)
         
         # 按创建时间排序（最新的在前）
         type_records_sorted = sorted(type_records, key=lambda x: x.get('created_at', ''), reverse=True)
@@ -109,6 +109,9 @@ async def list_all_income_records(date: str):
                         time_str = created_at.split(' ')[1].split('.')[0][:8] if ' ' in created_at else created_at
                 except:
                     time_str = created_at[:19].split(' ')[1] if ' ' in created_at else created_at
+            
+            # 格式化归属ID显示
+            group_display = group_id if group_id else '全局'
             
             # 简洁格式输出：序号 | 金额 | 订单号 | 时间
             print(f"{i:>3}. {amount:>14,.2f} | {order_display:>25} | {time_str:>10}")
