@@ -770,24 +770,43 @@ async def handle_report_callback(update: Update, context: ContextTypes.DEFAULT_T
             return
 
         await query.answer()
-        # 解析: income_adv_page_{type}_{group}_{start_date}_{end_date}_{page}
-        parts = data.replace("income_adv_page_", "").split("_")
-        if len(parts) >= 6:
-            page = int(parts[-1])
-            end_date = parts[-2]
-            start_date = parts[-3]
-            group_key = parts[-4]
-            type_key = parts[-5]
-
-            final_type = None if type_key == 'all' else type_key
-
-            # 处理 group_id
-            if group_key == 'all':
-                final_group = None  # 不过滤
-            elif group_key == 'NULL':
-                final_group = 'NULL_SPECIAL'  # 特殊标记
+        # 解析: income_adv_page_{type}|{group}|{start_date}|{end_date}|{page}
+        # 使用 | 作为分隔符，避免日期中的连字符干扰
+        param_str = data.replace("income_adv_page_", "")
+        if "|" in param_str:
+            # 新格式：使用 | 分隔
+            parts = param_str.split("|")
+            if len(parts) >= 5:
+                type_key = parts[0]
+                group_key = parts[1]
+                start_date = parts[2]
+                end_date = parts[3]
+                page = int(parts[4])
             else:
-                final_group = group_key
+                await query.answer("❌ 分页参数错误", show_alert=True)
+                return
+        else:
+            # 兼容旧格式（使用 _ 分隔）
+            parts = param_str.split("_")
+            if len(parts) >= 6:
+                page = int(parts[-1])
+                end_date = parts[-2]
+                start_date = parts[-3]
+                group_key = parts[-4]
+                type_key = parts[-5]
+            else:
+                await query.answer("❌ 分页参数错误", show_alert=True)
+                return
+
+        final_type = None if type_key == 'all' else type_key
+
+        # 处理 group_id
+        if group_key == 'all':
+            final_group = None  # 不过滤
+        elif group_key == 'NULL':
+            final_group = 'NULL_SPECIAL'  # 特殊标记
+        else:
+            final_group = group_key
 
             # 查询记录
             if final_group == 'NULL_SPECIAL':
