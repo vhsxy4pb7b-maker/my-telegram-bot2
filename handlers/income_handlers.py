@@ -70,7 +70,7 @@ async def format_income_detail(record: dict) -> str:
 
     # 获取订单号
     order_id = record.get('order_id') or '无'
-    
+
     # 格式化金额
     amount_str = f"{record['amount']:,.2f}"
 
@@ -114,7 +114,8 @@ async def generate_income_report(records: list, start_date: str, end_date: str,
     report += f"{'═' * 30}\n\n"
 
     # 按类型显示顺序：订单完成、违约完成、本金减少、利息收入
-    type_order = ['completed', 'breach_end', 'principal_reduction', 'interest', 'adjustment']
+    type_order = ['completed', 'breach_end',
+                  'principal_reduction', 'interest', 'adjustment']
 
     # 如果指定了类型，只显示该类型
     if income_type:
@@ -172,9 +173,8 @@ async def generate_income_report(records: list, start_date: str, end_date: str,
             type_name = INCOME_TYPES.get(type_key, type_key)
             type_records = by_type[type_key]
 
-            # 按时间倒序排序（最新的在前）
-            type_records.sort(key=lambda x: x.get(
-                'created_at', ''), reverse=True)
+            # 按录入时间正序排序（最早录入的在前）
+            type_records.sort(key=lambda x: x.get('created_at', '') or '')
 
             type_total = sum(r['amount'] for r in type_records)
             type_count = len(type_records)
@@ -187,7 +187,7 @@ async def generate_income_report(records: list, start_date: str, end_date: str,
             # 如果记录太多，只显示第一页
             if type_count > items_per_page:
                 display_records = type_records[:items_per_page]
-            report += f"📄 显示前 {items_per_page}/{type_count} 条\n"
+                report += f"📄 显示前 {items_per_page}/{type_count} 条\n"
             else:
                 display_records = type_records
 
