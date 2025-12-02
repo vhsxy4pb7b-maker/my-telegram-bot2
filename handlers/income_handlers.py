@@ -27,13 +27,47 @@ async def format_income_detail(record: dict) -> str:
     # 获取订单号
     order_id = record.get('order_id') or '无'
     
-    # 获取时间
+    # 获取时间（转换为北京时间显示）
     time_str = ""
     if record.get('created_at'):
         try:
-            dt = datetime.fromisoformat(record['created_at'].replace('Z', '+00:00'))
-            time_str = dt.strftime("%H:%M:%S")
-        except:
+            created_at_str = record['created_at']
+            dt = None
+            
+            # 尝试多种时间格式
+            # 格式1: ISO格式带时区 (2024-12-02T15:00:00Z 或 2024-12-02T15:00:00+00:00)
+            if 'T' in created_at_str:
+                try:
+                    dt = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
+                except:
+                    # 移除微秒部分再试
+                    created_at_str_clean = created_at_str.split('.')[0].split('+')[0].split('Z')[0]
+                    dt = datetime.strptime(created_at_str_clean, "%Y-%m-%dT%H:%M:%S")
+                    dt = pytz.utc.localize(dt)
+            else:
+                # 格式2: SQLite格式 (2024-12-02 15:00:00)
+                try:
+                    # 尝试带微秒的格式
+                    if '.' in created_at_str:
+                        dt = datetime.strptime(created_at_str.split('.')[0], "%Y-%m-%d %H:%M:%S")
+                    else:
+                        dt = datetime.strptime(created_at_str, "%Y-%m-%d %H:%M:%S")
+                except:
+                    # 尝试其他格式
+                    dt = datetime.strptime(created_at_str.split('.')[0], "%Y-%m-%d %H:%M:%S")
+            
+            # 如果没有时区信息，假设是UTC（生产环境服务器通常是UTC时区）
+            if dt and dt.tzinfo is None:
+                dt = pytz.utc.localize(dt)
+            
+            if dt:
+                # 转换为北京时间
+                tz_beijing = pytz.timezone('Asia/Shanghai')
+                dt_beijing = dt.astimezone(tz_beijing)
+                # 格式化显示
+                time_str = dt_beijing.strftime("%H:%M:%S")
+        except Exception as e:
+            logger.warning(f"解析时间失败: {record.get('created_at')}, 错误: {e}")
             pass
     
     # 格式：金额 订单号 时间
