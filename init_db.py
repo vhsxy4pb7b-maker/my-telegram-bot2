@@ -290,6 +290,24 @@ def init_database():
         is_undone INTEGER DEFAULT 0
     )
     ''')
+
+    # 创建日切数据汇总表
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS daily_summary (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL UNIQUE,
+        new_orders_count INTEGER DEFAULT 0,
+        new_orders_amount REAL DEFAULT 0,
+        completed_orders_count INTEGER DEFAULT 0,
+        completed_orders_amount REAL DEFAULT 0,
+        breach_end_orders_count INTEGER DEFAULT 0,
+        breach_end_orders_amount REAL DEFAULT 0,
+        daily_interest REAL DEFAULT 0,
+        company_expenses REAL DEFAULT 0,
+        other_expenses REAL DEFAULT 0,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
     
     # 检查并添加 chat_id 字段（如果不存在）- 迁移旧表结构
     cursor.execute("PRAGMA table_info(operation_history)")

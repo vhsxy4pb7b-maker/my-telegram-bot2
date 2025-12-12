@@ -247,11 +247,7 @@ async def show_income_detail(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     keyboard.extend([
         [
-            InlineKeyboardButton("📅 本月收入", callback_data="income_view_month"),
             InlineKeyboardButton("📆 日期查询", callback_data="income_view_query")
-        ],
-        [
-            InlineKeyboardButton("🔍 分类查询", callback_data="income_view_by_type")
         ],
         [
             InlineKeyboardButton(

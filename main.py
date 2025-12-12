@@ -302,6 +302,13 @@ def main() -> None:
                 print("定时播报任务已初始化")
             except UnicodeEncodeError:
                 print("Scheduled broadcasts initialized")
+            # 初始化日切报表任务
+            from utils.schedule_executor import setup_daily_report
+            await setup_daily_report(application.bot)
+            try:
+                print("日切报表任务已初始化")
+            except UnicodeEncodeError:
+                print("Daily report task initialized")
 
         try:
             print("机器人已启动，等待消息...")

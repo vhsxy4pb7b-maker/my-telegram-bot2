@@ -406,13 +406,7 @@ async def handle_report_callback(update: Update, context: ContextTypes.DEFAULT_T
         keyboard.extend([
             [
                 InlineKeyboardButton(
-                    "📅 本月收入", callback_data="income_view_month"),
-                InlineKeyboardButton(
                     "📆 日期查询", callback_data="income_view_query")
-            ],
-            [
-                InlineKeyboardButton(
-                    "🔍 分类查询", callback_data="income_view_by_type")
             ],
             [
                 InlineKeyboardButton(
@@ -1155,11 +1149,13 @@ async def handle_report_callback(update: Update, context: ContextTypes.DEFAULT_T
                 InlineKeyboardButton(
                     "🔎 查找订单", callback_data="report_search_orders")
             ])
-            # 仅管理员显示收入明细按钮
+            # 仅管理员显示收入明细和订单总表按钮
             if user_id and user_id in ADMIN_IDS:
                 keyboard.append([
                     InlineKeyboardButton(
-                        "💰 收入明细", callback_data="income_view_today")
+                        "💰 收入明细", callback_data="income_view_today"),
+                    InlineKeyboardButton(
+                        "📊 订单总表", callback_data="order_table_view")
                 ])
         elif group_id:
             # 如果用户有权限限制，不显示返回按钮（因为不能返回全局视图）
@@ -1215,3 +1211,60 @@ async def handle_report_callback(update: Update, context: ContextTypes.DEFAULT_T
         )
         context.user_data['state'] = 'REPORT_QUERY'
         context.user_data['report_group_id'] = group_id
+        return
+
+    # ========== 订单总表回调（仅管理员） ==========
+    if data == "order_table_view":
+        if not user_id or user_id not in ADMIN_IDS:
+            await query.answer("❌ 此功能仅限管理员使用", show_alert=True)
+            return
+
+        await query.answer()
+        from handlers.order_table_handlers import show_order_table
+        
+        # 创建一个模拟的update对象来调用show_order_table
+        class MockMessage:
+            def __init__(self, original_message):
+                self.chat_id = original_message.chat_id
+                self.message_id = original_message.message_id
+            
+            async def reply_text(self, text, reply_markup=None):
+                await query.message.reply_text(text, reply_markup=reply_markup)
+        
+        class MockUpdate:
+            def __init__(self, query):
+                self.effective_user = query.from_user
+                self.message = MockMessage(query.message)
+        
+        mock_update = MockUpdate(query)
+        await show_order_table(mock_update, context)
+        return
+
+    # ========== 订单总表Excel导出回调（仅管理员） ==========
+    if data == "order_table_export_excel":
+        if not user_id or user_id not in ADMIN_IDS:
+            await query.answer("❌ 此功能仅限管理员使用", show_alert=True)
+            return
+
+        await query.answer()
+        from handlers.order_table_handlers import export_order_table_excel
+        # 创建一个模拟的update对象来调用export_order_table_excel
+        class MockMessage:
+            def __init__(self, original_message):
+                self.chat_id = original_message.chat_id
+                self.message_id = original_message.message_id
+            
+            async def reply_text(self, text, reply_markup=None):
+                await query.message.reply_text(text, reply_markup=reply_markup)
+            
+            async def reply_document(self, document, filename=None, caption=None):
+                await query.message.reply_document(document=document, filename=filename, caption=caption)
+        
+        class MockUpdate:
+            def __init__(self, query):
+                self.effective_user = query.from_user
+                self.message = MockMessage(query.message)
+        
+        mock_update = MockUpdate(query)
+        await export_order_table_excel(mock_update, context)
+        return
